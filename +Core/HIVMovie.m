@@ -6,6 +6,7 @@ classdef HIVMovie < handle
     
     properties (SetAccess = 'private')
         raw
+        dataType = {'lamina','NUP','HIV','lipid'}
     end
     
     properties
@@ -14,16 +15,20 @@ classdef HIVMovie < handle
     
     methods
         %Constructor
-        function obj = HIVMovie(info)
+        function obj = HIVMovie(ext,info,varargin)
             %MOVIE Construct an instance of this class
             %   We allow the user to create this object with various number
             %   of input allowing therefore to restart the analysis at any
             %   steps in the process.
             
-            [path] = uigetdir();
+            if isempty(varargin{1})          
+                [path] = uigetdir();
+            else
+                path = varargin{1};
+            end
             
-            raw = path;
-           
+            obj.raw = {path; ext};
+            obj.info = info;
             
         end
         
@@ -32,7 +37,72 @@ classdef HIVMovie < handle
      
         end
         
+        function set.raw(obj,raw)
+            
+            assert(isfolder(raw{1}),'The path provided does not appear to exist');
+            assert(ischar(raw{2}),'Extension needs to be a string');
+            obj.checkExtension(raw{2});
+            
+            
+            [files] = obj.getFileInPath(raw{1},raw{2});
+            ext = strrep(raw{2},'.','');
+            movInfo = struct();
+            warning('off')
+            
+            for i = 1:length(files)
+               [movI] = Load.Movie.(ext).getInfo([files(i).folder filesep files(i).name]); 
+               
+               movInfo(i).path = [files(i).folder filesep files(i).name];
+               movInfo(i).fileName = [files(i).name];
+               movInfo(i).Width = movI.Width;
+               movInfo(i).Length = movI.Length;           
+               
+               
+            end
+            warning('on')
+            
+            obj.raw.ext = raw{2};
+            obj.raw.movInfo = movInfo;          
+            
+            
+        end
         
+        function getExtraInfo(obj)
+            movInfo = obj.raw.movInfo;
+            datatype = obj.dataType;
+            for i = 1:length(movInfo)
+                name = movInfo(i).fileName;                
+                
+                for j = 1:length(datatype)
+                    chk = contains(name,datatype{i},'IgnoreCase',true);
+                    if chk
+                        obj.raw.movInfo(i).datatype = datatype{i};
+                        break;
+                                                        
+                    end
+                end
+            end
+            
+            disp(['We have detected ' num2str(length(movInfo)) ' files, please fill in the additional information']);
+            
+            prompt = {'FWHM(px)','pxSize(nm)'}';
+            dlgTitle = 'Information about experimental parameters';
+            numLines = 1;
+            defaultVal = {'2','100'};
+            answer = inputdlg(prompt,dlgTitle,numLines,defaultVal);
+            
+            assert(~isempty(answer),'User canceled input dialog, Simulation was aborted')
+            
+            FWHM_pix = str2double(answer(1));
+            assert(~isnan(FWHM_pix),'FWHM should be numerical');
+            
+            pxSize = str2double(answer(1));
+            assert(~isnan(FWHM_pix),'FWHM should be numerical');
+            
+            obj.info.pxSize = pxSize;
+            obj.info.FWHM_pix = FWHM_pix;
+            
+        end
         
         function giveInfo(obj)
             %Make a prompt asking some question to the user.
@@ -190,7 +260,7 @@ classdef HIVMovie < handle
         
         function checkExtension(ext)
             ext = lower(ext);
-            extensionList = {'.his','.ome.tif','.mpg','.oif'};
+            extensionList = {'.tif'};
             
             check = contains(extensionList,ext);
             
