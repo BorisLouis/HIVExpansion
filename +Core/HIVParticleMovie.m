@@ -125,71 +125,75 @@ classdef HIVParticleMovie < Core.HIVMovie
         function SRLocalizeCandidate(obj,roiSize,frames)
             assert(~isempty(obj.info),'Information about the setup are missing to consolidate, please fill them in using giveInfo method');
             if isempty(obj.candidatePos)
-                 warning('There was no HIV data or no detected particles so we aborted localization');
-            end
-            
-            [run,locPos] = obj.existLocPos(obj.raw.path,'.mat');
-            disp('Preparing for fitting')
-           
-            switch nargin
-
-                case 1
-                    roiSize = 6;
-                    frames = 1: obj.raw.movInfo(1).nFrames;
-                    disp('Running SRLocalization on every frame with ROI of 6 pixel radius');
-
-                case 2
-
-                    frames = 1: obj.raw.movInfo(1).nFrames;
-                    disp('Running SRLocalization on every frame');
-
-                case 3
-
-                    [frames] = obj.checkFrame(frames);
-
-                otherwise
-
-                    error('too many inputs');
-
-            end
-            
-            if run
-                locPos = cell(size(obj.candidatePos));
-                h = waitbar(0,'Fitting candidates ...');
-                nFrames = length(frames);
-                %Localization occurs here
-                for i = 1 : 1:nFrames
-                    disp(['Fitting candidates: frame ' num2str(i) ' / ' num2str(nFrames)]);
-                    idx = frames(i);
-                    %1 Extract Candidate Position for specific frame
-                    [data] = obj.getFrame(idx,'HIV');
-                    [frameCandidate] = obj.getCandidatePos(idx);
-                    
-                    if isempty(frameCandidate)
-                        
-                        warning('Frame %d did not contain any candidate',idx);
-                        locPos{i} = [];
-                        
-                    else
-                        
-                        locPos{i} = obj.superResLocFit(data,frameCandidate,roiSize);
-                        
-                    end
-                    waitbar(i/nFrames,h,['Fitting candidates: frame ' num2str(i) '/' num2str(nFrames) ' done']);
-                end
-                close(h)
+                warning('There was no HIV data or no detected particles so we aborted localization');
+                obj.unCorrLocPos = [];
+                obj.corrLocPos   = [];
+                obj.info.roiSize = [];
             else
-                disp('Previous data found, Loading from there')
-            end
-                %save the data
-            fileName = sprintf('%s%sSRLocPos.mat',obj.raw.path,'\');
-            save(fileName,'locPos');
             
-            %store in the object
-            obj.unCorrLocPos = locPos;
-            obj.corrLocPos   = locPos;
-            obj.info.roiSize = roiSize;
-            disp('=====> DONE <======')
+                [run,locPos] = obj.existLocPos(obj.raw.path,'.mat');
+                disp('Preparing for fitting')
+
+                switch nargin
+
+                    case 1
+                        roiSize = 6;
+                        frames = 1: obj.raw.movInfo(1).nFrames;
+                        disp('Running SRLocalization on every frame with ROI of 6 pixel radius');
+
+                    case 2
+
+                        frames = 1: obj.raw.movInfo(1).nFrames;
+                        disp('Running SRLocalization on every frame');
+
+                    case 3
+
+                        [frames] = obj.checkFrame(frames);
+
+                    otherwise
+
+                        error('too many inputs');
+
+                end
+
+                if run
+                    locPos = cell(size(obj.candidatePos));
+                    h = waitbar(0,'Fitting candidates ...');
+                    nFrames = length(frames);
+                    %Localization occurs here
+                    for i = 1 : 1:nFrames
+                        disp(['Fitting candidates: frame ' num2str(i) ' / ' num2str(nFrames)]);
+                        idx = frames(i);
+                        %1 Extract Candidate Position for specific frame
+                        [data] = obj.getFrame(idx,'HIV');
+                        [frameCandidate] = obj.getCandidatePos(idx);
+
+                        if isempty(frameCandidate)
+
+                            warning('Frame %d did not contain any candidate',idx);
+                            locPos{i} = [];
+
+                        else
+
+                            locPos{i} = obj.superResLocFit(data,frameCandidate,roiSize);
+
+                        end
+                        waitbar(i/nFrames,h,['Fitting candidates: frame ' num2str(i) '/' num2str(nFrames) ' done']);
+                    end
+                    close(h)
+                else
+                    disp('Previous data found, Loading from there')
+                end
+                    %save the data
+                fileName = sprintf('%s%sSRLocPos.mat',obj.raw.path,'\');
+                save(fileName,'locPos');
+
+                %store in the object
+                obj.unCorrLocPos = locPos;
+                obj.corrLocPos   = locPos;
+                obj.info.roiSize = roiSize;
+                disp('=====> DONE <======')
+            end
         end
         
         function [locPos] = getLocPos(obj,frames)
@@ -851,7 +855,7 @@ classdef HIVParticleMovie < Core.HIVMovie
         function [candidate] = detectCandidate(obj,detectParam,frames)
             idxHIV = contains({obj.raw.movInfo.datatype},'HIV');
             if sum(idxHIV) == 0
-                obj.candidatePos = [];
+                candidate = [];
                 warning('There was no HIV data so we aborted localization');
             elseif sum(idxHIV) == 1
                

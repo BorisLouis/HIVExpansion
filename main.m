@@ -9,16 +9,16 @@ close all
 clc
 
 %% User Input
-path = 'D:\Documents\Unif\PhD\2021-Data\19\LaminHIV'; %give empty brackets [], to open file selection
+path = 'D:\Documents\Unif\PhD\2021-Data\19\Lamina-NUP\cell1'; %give empty brackets [], to open file selection
 ext = '.tif'; %expected extension of the movie(s);
-info.runMethod = 'run'; %'load'or 'run', if load is chosen it will try to load previously calculated data(e.g localized particles)
+info.runMethod = 'load'; %'load'or 'run', if load is chosen it will try to load previously calculated data(e.g localized particles)
 info.fitMethod = 'phasor'; %'Gauss' or 'phasor'
 info.zMethod   = 'Intensity';
 %if it exist. run will always re-run the analysis and erase previous data.
 
 %% Data Loading
 
-HIVData = Core.HIVLocMovie(ext,info,path);
+HIVData = Core.HIVCellMovie(ext,info,path);
 
 HIVData.getExtraInfo();
 
@@ -27,9 +27,9 @@ HIVData.getExtraInfo();
 detectParam.delta = 6; % ROI around the molecule for testing
 detectParam.chi2  = 60;% Threshold for detections ([24-80],24 for single molecules, up to 80 for brighter objects
 HIVData.findCandidatePos(detectParam);
-
-HIVData.showCandidate(1,5);
-
+if ~isempty(HIVData.candidatePos)
+    HIVData.showCandidate(1,5);
+end
 %% Localization
 %Fitting for accurate localization of the detected particle
 HIVData.SRLocalizeCandidate();
@@ -40,3 +40,13 @@ HIVData.consolidatePlanes();
 
 %% Super-resolve in 3D
 HIVData.superResolve();
+
+
+%% Segmentation of Lamina
+ 
+HIVData.segmentLamina();
+
+%% Segmentation of NUP
+HIVData.segmentNUP();
+
+

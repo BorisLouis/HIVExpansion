@@ -1,29 +1,33 @@
-classdef HIVCellMovie < Core.HIVTrackingMovie
+classdef HIVCellMovie < Core.HIVLocMovie
     properties (SetAccess = 'protected')
-        contour
+        Lamina
+        NUP
+        Lipid
+        
         
     end
     
     
     methods
         
-       function obj = HIVCellMovie(raw,info)
+       function obj = HIVCellMovie(ext,info,varargin)
             
-            obj  = obj@Core.HIVTrackingMovie(raw,info);
+            obj  = obj@Core.HIVLocMovie(ext,info,varargin{1});
            
         end
         
-        function [allMask] = getCellMask(obj,threshold)
+        function [gBW] = segmentLamina(obj)
             
-            nFrame = obj.raw.movInfo.nFrame;
-            allMask = zeros(obj.raw.movInfo.Length,obj.raw.movInfo.Width,obj.raw.movInfo.nPlane,obj.raw.movInfo.nFrame,'logical');
-            for i = 1 :nFrame
+            idx = contains({obj.raw.movInfo.fileName},'lamina','IgnoreCase',true);
+            if sum(idx)~=1
+                warning('no lamina file was found, operation aborted');
                 
-                data = obj.getFrame(i,'cells');
+            else
+                data = obj.getFrame(1,'lamina');
                 % Gaussian filtering
                 S = 2; 
                 % size of pixel in z vs x/y
-                zFactor = obj.info.dZ/obj.raw.movInfo.pxSize;
+                zFactor = obj.raw.movInfo(1).zSpacing/obj.info.pxSize;
                 sigma = [S,S,S/zFactor];
                 IMs = imgaussfilt3(data, sigma);
                 disp('DONE with filtering ------------')
@@ -35,55 +39,80 @@ classdef HIVCellMovie < Core.HIVTrackingMovie
                 gBW = bwareaopen(gBW,5000);
                 gBW = imfill(gBW,'holes');            
                 disp('Extracting Contour')
+
                 %here we obtain the cell contour
-                contourtmp = obj.getCellContour(gBW);
-                 obj.contour{i} = contourtmp;
-%                 %% Extract contour
-%                 fContour = [];
-%                 for z = 1 :size(IMs,3)
-%                     if ~isempty(contourtmp{z})
-%                         for j = 1:length(contourtmp{z})
+                contour = obj.getLaminaContour(gBW);
+
+                obj.Lamina.mask = gBW;
+                obj.Lamina.contour = contour;
+%                 
+%                 %% building 3D mask
+%                 mask3D = zeros(size(IMs));
+%                 for j = 1:size(IMs,3)
+%                     mask3D(:,:,j) = Misc.mpoly2mask(contourtmp{1},[size(IMs,1) size(IMs,2)],'style','ij');                    
+% %                     if ~isempty(fContour)
+% %                         idx = find(fContour(:,3)==j);
+% %                         mask3D(:,:,j) = poly2mask(fContour(idx,2),fContour(idx,1),size(IMs,1),size(IMs,2));
+% %                     end
+%                 end
 % 
-%                             fContour = [fContour ; contourtmp{z}{j}(:,1) contourtmp{z}{j}(:,2) ones(length(contourtmp{z}{j}(:,1)),1)*z];
+%                 %% Cleaning mask
 % 
-%                         end
-%                     end
-%                 end   
-                %% building 3D mask
-                mask3D = zeros(size(IMs));
-                for j = 1:size(IMs,3)
-                    mask3D(:,:,j) = Misc.mpoly2mask(contourtmp{1},[size(IMs,1) size(IMs,2)],'style','ij');                    
-%                     if ~isempty(fContour)
-%                         idx = find(fContour(:,3)==j);
-%                         mask3D(:,:,j) = poly2mask(fContour(idx,2),fContour(idx,1),size(IMs,1),size(IMs,2));
-%                     end
-                end
+%                 test = bwlabeln(mask3D);
+%                 data = regionprops3(test,'Volume','VoxelList','VoxelIdxList');
+% 
+%                 for j = 1:height(data)
+%                    currentIdx = data.VoxelList{j,:};
+%                    if length(unique(currentIdx(:,3)))>1
+% 
+%                    else
+%                        idx2Delete = data.VoxelIdxList{j,:};
+%                        mask3D(idx2Delete) = 0;
+%                    end
+% 
+%                 end
+%              
 
-                %% Cleaning mask
+%                 allMask(:,:,:,i) = logical(mask3D);
 
-                test = bwlabeln(mask3D);
-                data = regionprops3(test,'Volume','VoxelList','VoxelIdxList');
-
-                for j = 1:height(data)
-                   currentIdx = data.VoxelList{j,:};
-                   if length(unique(currentIdx(:,3)))>1
-
-                   else
-                       idx2Delete = data.VoxelIdxList{j,:};
-                       mask3D(idx2Delete) = 0;
-                   end
-
-                end
-             
-               
-                allMask(:,:,:,i) = logical(mask3D);
-                
+    %             
+    %             filename = [obj.raw.movInfo.path2Cell filesep 'mask.mat'];
+    %             save(filename,'allMask','-v7.3');
             end
-            
-            filename = [obj.raw.movInfo.path2Cell filesep 'mask.mat'];
-            save(filename,'allMask','-v7.3');
-            
         end
+        
+        
+        function [gBW] = segmentNUP(obj)
+            
+            idx = contains({obj.raw.movInfo.fileName},'NUP','IgnoreCase',true);
+            if sum(idx)~=1
+                warning('no lamina file was found, operation aborted');
+                
+            else
+                data = obj.getFrame(1,'NUP');
+                % Gaussian filtering
+                S = 2; 
+                % size of pixel in z vs x/y
+                zFactor = obj.raw.movInfo(1).zSpacing/obj.info.pxSize;
+                sigma = [S,S,S/zFactor];
+                IMs = imgaussfilt3(data, sigma);
+                disp('DONE with filtering ------------')
+
+              %  gBW = imbinarize(uint16(IMs),'adaptive','Sensitivity',threshold);
+                gBW = imbinarize(uint16(IMs));
+                se = strel('disk',5);
+                gBW = imclose(gBW,se);
+                %gBW = bwareaopen(gBW,5000);
+                gBW = imfill(gBW,'holes');            
+                disp('Extracting Contour')
+
+                %here we obtain the cell contour
+                contour = obj.getLaminaContour(gBW);
+
+                obj.Lamina.mask = gBW;
+                obj.Lamina.contour = contour;
+            end
+            end
           
         function plotContour3D(obj,frame)
             
@@ -342,12 +371,12 @@ classdef HIVCellMovie < Core.HIVTrackingMovie
     
     methods (Access = private)
         
-         function [contour] = getCellContour(obj,gBW)
+         function [contour] = getLaminaContour(~,gBW)
             contour = cell(1,size(gBW,3));
             for i = 1:size(gBW,3)
                 currBW = gBW(:,:,i);
                 
-                newBW = imfill(currBW,'holes');
+              %  newBW = imfill(currBW,'holes');
    
                 %Get the largest area
               %  cBWarea = regionprops(currBW,'Area');
@@ -359,7 +388,7 @@ classdef HIVCellMovie < Core.HIVTrackingMovie
                 %idx = ismember([nBWarea.Area],[cBWarea.Area]);
                 
                 %kill all the other area found
-                [pContour] = bwboundaries(newBW);
+                [pContour] = bwboundaries(currBW);
                 contour{i} = pContour;
                
             end

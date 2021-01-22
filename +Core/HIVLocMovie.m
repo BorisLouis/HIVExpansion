@@ -123,40 +123,7 @@ classdef HIVLocMovie < Core.HIVParticleMovie
     
     
     methods (Access = protected)
-    
-        function [zPos,inRange] = getZPosition(obj,val2Z,zCal,currentPlane,method)
-            
-            relZ = obj.calibrated.oRelZPos;
-
-            zRange = zCal.fitZParam.zRange;
-            zRange = zRange{currentPlane};
-            zVec = zRange(1):1:zRange(2); %Here we assume accuracy >= 1nm
-
-            switch method
-                case 'poly'
-
-                    fit = polyval(zCal.calib{currentPlane,1},zVec);
-
-                case 'spline'
-                    
-                    fit = ppval(zCal.calib{currentPlane,2},zVec);
-                    
-            end
-
-            %find the index of the value the closest to the particle
-            %ellipticity
-             [~,idx] = min(abs(fit-val2Z));
-
-             zPos = zVec(idx)+ relZ(currentPlane)*1000;          
-             inRange = and(val2Z>=zCal.fitZParam(1).ellipRange(1),...
-                 val2Z<=zCal.fitZParam(1).ellipRange(2));
-            
-             if isempty(zPos)
-                 disp('ouuups zpos is empty');
-             end
-
-        end
-         
+             
         function [data] = resolveXYZInt(obj,partData,frameData)
             planes2Fit =5;
             nPlanes = size(frameData,3);
@@ -165,7 +132,7 @@ classdef HIVLocMovie < Core.HIVParticleMovie
             planes  = partData(~isnan(partData.plane),:).plane;
 
             bf = partData.plane(3);
-            planePos = obj.raw.movInfo(1).planePos*1000;
+            planePos = obj.raw.movInfo(1).planePos;
             
             %Get ROI XZ, YZ scaled to same pixel size
             [Mag] = Core.HIVLocMovie.getZPhasorMag(partData,ROIRad,frameData);

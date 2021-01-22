@@ -59,7 +59,7 @@ classdef HIVMovie < handle
                    movInfo(i).Length = movI.Length;           
                    movInfo(i).nFrames = movI.nFrames;
                    movInfo(i).nPlanes = movI.nPlanes;
-                   movInfo(i).zSpacing = movI.zSpacing;
+                   movInfo(i).zSpacing = movI.zSpacing*1000;
                    movInfo(i).planePos = [0:movI.nPlanes-1]*movI.zSpacing;
                     
                 end
@@ -110,7 +110,7 @@ classdef HIVMovie < handle
             FWHM_px = str2double(answer(1));
             assert(~isnan(FWHM_px),'FWHM should be numerical');
             
-            pxSize = str2double(answer(1));
+            pxSize = str2double(answer(2));
             assert(~isnan(pxSize),'pxSize should be numerical');
             
             obj.info.pxSize = pxSize;
