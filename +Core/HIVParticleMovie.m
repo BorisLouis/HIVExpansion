@@ -1,5 +1,5 @@
 classdef HIVParticleMovie < Core.HIVMovie
-    %UNTITLED2 Summary of this class goes here
+    %HIVParticleMovie Summary of this class goes here
     %   Detailed explanation goes here
     
     properties (SetAccess = 'protected')
@@ -13,9 +13,9 @@ classdef HIVParticleMovie < Core.HIVMovie
     end
     
     methods
-        function obj = HIVParticleMovie(raw,info)
+        function obj = HIVParticleMovie(ext,info,varargin)
             
-            obj  = obj@Core.HIVMovie(raw,info);
+            obj  = obj@Core.HIVMovie(ext,info,varargin{1});
             
         end
         
@@ -23,31 +23,35 @@ classdef HIVParticleMovie < Core.HIVMovie
             %Allow the user to extract data from a specific frame, behavior
             %depends on the calibration
             assert(length(idx)==1,'Only one frame at a time');
-            [idx] = Core.HIVMovie.checkFrame(idx,obj.raw.movInfo.nFrame);
+            [idx] = Core.HIVMovie.checkFrame(idx,obj.raw.movInfo(1).nFrames);
             
-            if strcmp(chan,'cells')
-                fileN = obj.raw.movInfo.path2Cell;
-                                
-            elseif strcmp(chan, 'part')
-                fileN = obj.raw.movInfo.path2Part;               
+            switch lower(chan)
+                case 'nup'
+                    idx2File = contains({obj.raw.movInfo.fileName},'nup','IgnoreCase',true);
+                    
+                case 'lamina'
+                    idx2File = contains({obj.raw.movInfo.fileName},'lamina','IgnoreCase',true);
+                    
+                case 'hiv'
+                    idx2File = contains({obj.raw.movInfo.fileName},'hiv','IgnoreCase',true);
+                  
+                case 'lipid'
+                    idx2File = contains({obj.raw.movInfo.fileName},'lipid','IgnoreCase',true);
+                    
+                otherwise
+                    error('Unknown channel requested')
+            end
+            
+            path = obj.raw.movInfo(idx2File).path;
+                    
+            frame = zeros(obj.raw.movInfo(idx2File).Length,obj.raw.movInfo(idx2File).Width,obj.raw.movInfo(idx2File).nPlanes);
+            warning('off')
+            for i =1:size(frame,3)
                 
-            else
-                error('Unknown channel')
-            end
-            
-            file2Extract = Core.HIVMovie.getFileInPath(fileN,'.tif');
-            if isempty(file2Extract)
-                error('no tif file found in the directory, check that you use loadData')
-            end
-            frame = zeros(obj.raw.movInfo.Length,obj.raw.movInfo.Width,obj.raw.movInfo.nPlane);
-            
-            for i =1:length(file2Extract)
-               path2File = [file2Extract(i).folder filesep 'calibratedPlane' num2str(i) '.tif'];
+               frame(:,:,i) = Load.Movie.tif.getFrames(path,idx);
                
-               frame(:,:,i) = Load.Movie.tif.getFrames(path2File,idx);
             end
-            
-            
+            warning('on')
         end
                 
         function findCandidatePos(obj,detectParam, frames)
@@ -56,13 +60,13 @@ classdef HIVParticleMovie < Core.HIVMovie
              switch nargin
                     case 2
                         
-                        frames = 1: obj.raw.movInfo.nFrame;
+                        frames = 1: obj.raw.movInfo(1).nFrames;
                         disp('Running detection on every frame');
      
                         
                     case 3
                         
-                        [frames] = obj.checkFrame(frames, obj.raw.movInfo.nFrame);
+                        [frames] = obj.checkFrame(frames, obj.raw.movInfo(1).nFrames);
                         
                     otherwise
                         
@@ -70,7 +74,7 @@ classdef HIVParticleMovie < Core.HIVMovie
                         
              end
             
-            [run, candidate] = obj.existCandidate(obj.raw.movInfo.dataDir, '.mat');
+            [run, candidate] = obj.existCandidate(obj.raw.path, '.mat');
             
             %if we only ask 1 frame we always run
             if length(frames) == 1
@@ -95,9 +99,9 @@ classdef HIVParticleMovie < Core.HIVMovie
                 
             end
             %if we only ask 1 frame we do not save
-            if length(frames) >1
+            if or(length(frames) >1,length(frames)==obj.raw.movInfo(1).nFrames)
                 %save the data
-                fileName = sprintf('%s%scandidatePos.mat',obj.raw.movInfo.dataDir,'\');
+                fileName = sprintf('%s%scandidatePos.mat',obj.raw.path,'\');
                 save(fileName,'candidate');
             else
             end
@@ -108,7 +112,7 @@ classdef HIVParticleMovie < Core.HIVMovie
         
         function [candidate] = getCandidatePos(obj, frames)
             %Extract the position of the candidate of a given frame
-            [idx] = Core.HIVMovie.checkFrame(frames,obj.raw.movInfo.nFrame);
+            [idx] = Core.HIVMovie.checkFrame(frames,obj.raw.movInfo(1).nFrames);
             candidate = obj.candidatePos{idx};
             
             if isempty(candidate)
@@ -120,21 +124,23 @@ classdef HIVParticleMovie < Core.HIVMovie
         
         function SRLocalizeCandidate(obj,roiSize,frames)
             assert(~isempty(obj.info),'Information about the setup are missing to consolidate, please fill them in using giveInfo method');
-            assert(~isempty(obj.candidatePos), 'No candidate found, please run findCandidatePos before consolidation');
+            if isempty(obj.candidatePos)
+                 warning('There was no HIV data or no detected particles so we aborted localization');
+            end
             
-            [run,locPos] = obj.existLocPos(obj.raw.movInfo.dataDir,'.mat');
+            [run,locPos] = obj.existLocPos(obj.raw.path,'.mat');
             disp('Preparing for fitting')
            
             switch nargin
 
                 case 1
                     roiSize = 6;
-                    frames = 1: obj.raw.movInfo.nFrame;
+                    frames = 1: obj.raw.movInfo(1).nFrames;
                     disp('Running SRLocalization on every frame with ROI of 6 pixel radius');
 
                 case 2
 
-                    frames = 1: obj.raw.movInfo.nFrame;
+                    frames = 1: obj.raw.movInfo(1).nFrames;
                     disp('Running SRLocalization on every frame');
 
                 case 3
@@ -146,6 +152,7 @@ classdef HIVParticleMovie < Core.HIVMovie
                     error('too many inputs');
 
             end
+            
             if run
                 locPos = cell(size(obj.candidatePos));
                 h = waitbar(0,'Fitting candidates ...');
@@ -154,8 +161,8 @@ classdef HIVParticleMovie < Core.HIVMovie
                 for i = 1 : 1:nFrames
                     disp(['Fitting candidates: frame ' num2str(i) ' / ' num2str(nFrames)]);
                     idx = frames(i);
-                    %#1 Extract Candidate Position for specific frame
-                    [data] = obj.getFrame(idx,'part');
+                    %1 Extract Candidate Position for specific frame
+                    [data] = obj.getFrame(idx,'HIV');
                     [frameCandidate] = obj.getCandidatePos(idx);
                     
                     if isempty(frameCandidate)
@@ -175,7 +182,7 @@ classdef HIVParticleMovie < Core.HIVMovie
                 disp('Previous data found, Loading from there')
             end
                 %save the data
-            fileName = sprintf('%s%sSRLocPos.mat',obj.raw.movInfo.dataDir,'\');
+            fileName = sprintf('%s%sSRLocPos.mat',obj.raw.path,'\');
             save(fileName,'locPos');
             
             %store in the object
@@ -187,7 +194,7 @@ classdef HIVParticleMovie < Core.HIVMovie
         
         function [locPos] = getLocPos(obj,frames)
              %Extract the position of the candidate of a given frame
-            [idx] = Core.HIVMovie.checkFrame(frames,obj.raw.movInfo.nFrame);
+            [idx] = Core.HIVMovie.checkFrame(frames,obj.raw.movInfo(1).nFrames);
           
             locPos = obj.unCorrLocPos{idx};
            
@@ -202,99 +209,104 @@ classdef HIVParticleMovie < Core.HIVMovie
             %Consolidation refers to connect molecules that were localized
             %at similar position in different plane on a single frame.
             assert(~isempty(obj.info),'Information about the setup are missing to consolidate, please fill them in using giveInfo method');
-            assert(~isempty(obj.candidatePos), 'No candidate found, please run findCandidatePos before consolidation');
-            assert(~isempty(obj.unCorrLocPos),'Localization needs to be performed before consolidation');
-           
-            %Check if some particles were saved already.
-            [run, particle] = obj.existParticles(obj.raw.movInfo.dataDir, '.mat');
             
-            if run
-                %Check the number of function input
-                switch nargin
-                    case 1
-                        
-                        frames = 1: obj.raw.movInfo.nFrame;
-                        disp('Running consolidation on every frame with roi of 6 pixel');
-                        consThresh = 4;
-                    case 2
-                        [frames] = Core.HIVMovie.checkFrame(frames,obj.raw.movInfo.nFrame);
-                        consThresh = 4;                       
-                    case 3
-                        [frames] = Core.HIVMovie.checkFrame(frames,obj.raw.movInfo.nFrame);
-                        assert(isnumeric(consThresh),'Consolidation threshold should be numeric');
-                    otherwise
-                        
-                        error('Something wrong with number of input');
-                        
-                end
+            if isempty(obj.candidatePos)
                 
-                nFrames = length(frames);
-                %allocate for storage
-                particleList = cell(1,obj.raw.movInfo.nFrame);
-                nParticles = zeros(1,obj.raw.movInfo.nFrame);
-                idx2TP = zeros(1,obj.raw.movInfo.nFrame);
-                h = waitbar(0,'Consolidating candidate ...');
+                particle = [];
+                warning('There was no HIV data or no detected particles so we aborted localization')
+            else
                 
-                %Consolidation occurs here
-                for i = 1 : nFrames
-                    disp(['Consolidating frame ' num2str(i) ' / ' num2str(nFrames)]);
-                    idx = frames(i);
-                    %#1 Extract localized Position for specific frame
-                    [fCandMet] = obj.getLocPos(idx);
-                    
-                    if isempty(fCandMet)
-                        
-                        warning('Frame %d did not contain any localized positions',idx);
-                        particleList{idx} = [];
-                        %particleList{idx}{1} = nan(5);
-                        nParticles(idx) = 0;
-                        
-                    else
-                          %#2 Consolidate the position of the given frame
-                          %across plane
-                          %Calculate a focus metric (FM) combining ellipticity and GLRT FM.
-                          switch obj.info.zMethod
-                              case 'Intensity'
-                                 %we do not do anythin at the moment.
-                                 focusMetric = fCandMet.magX+fCandMet.magY;
-                              otherwise
-                                  error('Unknown zMethod')
-                          end
-                            %reformating to keep the same format as how the data is saved
-                            %later
-                            fCandMet.fMetric = focusMetric;
-                           
-                            %Plane Consolidation occur here
-                            [part] = obj.planeConsolidation(fCandMet,focusMetric,consThresh);
+                %Check if some particles were saved already.
+                [run, particle] = obj.existParticles(obj.raw.path, '.mat');
 
-                            %we delete empty cells from the array
-                            idx2Empty = cellfun(@isempty,part);
-                            part(idx2Empty(:,1),:) = [];
-                   
-                            particleList{idx} = part;
-                            nParticles(idx) = length(part);
-                            
-                            if ~isempty(part)
-                                idx2TP(idx) = idx;
-                            end
-                        
+                if run
+                    %Check the number of function input
+                    switch nargin
+                        case 1
+
+                            frames = 1: obj.raw.movInfo(1).nFrames;
+                            disp('Running consolidation on every frame with roi of 6 pixel');
+                            consThresh = 4;
+                        case 2
+                            [frames] = Core.HIVMovie.checkFrame(frames,obj.raw.movInfo(1).nFrames);
+                            consThresh = 4;                       
+                        case 3
+                            [frames] = Core.HIVMovie.checkFrame(frames,obj.raw.movInfo(1).nFrames);
+                            assert(isnumeric(consThresh),'Consolidation threshold should be numeric');
+                        otherwise
+
+                            error('Something wrong with number of input');
+
                     end
-                    waitbar((i+1)/nFrames,h,['Consolidating candidate... ' num2str(i+1) '/' num2str(nFrames) ' done']);
+
+                    nFrames = length(frames);
+                    %allocate for storage
+                    particleList = cell(1,obj.raw.movInfo(1).nFrames);
+                    nParticles = zeros(1,obj.raw.movInfo(1).nFrames);
+                    idx2TP = zeros(1,obj.raw.movInfo(1).nFrames);
+                    h = waitbar(0,'Consolidating candidate ...');
+
+                    %Consolidation occurs here
+                    for i = 1 : nFrames
+                        disp(['Consolidating frame ' num2str(i) ' / ' num2str(nFrames)]);
+                        idx = frames(i);
+                        %1 Extract localized Position for specific frame
+                        [fCandMet] = obj.getLocPos(idx);
+
+                        if isempty(fCandMet)
+
+                            warning('Frame %d did not contain any localized positions',idx);
+                            particleList{idx} = [];
+                            %particleList{idx}{1} = nan(5);
+                            nParticles(idx) = 0;
+
+                        else
+                              %2 Consolidate the position of the given frame
+                              %across plane
+                              %Calculate a focus metric (FM) combining ellipticity and GLRT FM.
+                              switch lower(obj.info.zMethod)
+                                  case 'intensity'
+                                     %we do not do anythin at the moment.
+                                     focusMetric = fCandMet.magX+fCandMet.magY;
+                                  otherwise
+                                      error('Unknown zMethod')
+                              end
+                                %reformating to keep the same format as how the data is saved
+                                %later
+                                fCandMet.fMetric = focusMetric;
+
+                                %Plane Consolidation occur here
+                                [part] = obj.planeConsolidation(fCandMet,focusMetric,consThresh);
+
+                                %we delete empty cells from the array
+                                idx2Empty = cellfun(@isempty,part);
+                                part(idx2Empty(:,1),:) = [];
+
+                                particleList{idx} = part;
+                                nParticles(idx) = length(part);
+
+                                if ~isempty(part)
+                                    idx2TP(idx) = idx;
+                                end
+
+                        end
+                        waitbar((i+1)/nFrames,h,['Consolidating candidate... ' num2str(i+1) '/' num2str(nFrames) ' done']);
+                    end
+                    close(h);
+
+                    %3 Storing List
+                    particle.List       = particleList;
+                    particle.nParticles = nParticles;
+                    particle.tPoint     = nFrames;
+                    particle.idx2TP     = nonzeros(idx2TP);
+                    particle.Traces     = [];
+                    particle.nTraces    = [];
+                    disp('=====> DONE <======')
+                    fileName = sprintf('%s%sparticle.mat',obj.raw.path,'\');
+                    save(fileName,'particle');
                 end
-                close(h);
-                
-                %#3 Storing List
-                particle.List       = particleList;
-                particle.nParticles = nParticles;
-                particle.tPoint     = nFrames;
-                particle.idx2TP     = nonzeros(idx2TP);
-                particle.Traces     = [];
-                particle.nTraces    = [];
-                disp('=====> DONE <======')
-                fileName = sprintf('%s%sparticle.mat',obj.raw.movInfo.dataDir,'\');
-                save(fileName,'particle');
             end
-            %#4 Storing particles in the object
+            %4 Storing particles in the object
             obj.particles = particle;
         end
         
@@ -313,10 +325,10 @@ classdef HIVParticleMovie < Core.HIVMovie
         function showCandidate(obj,idx,plane)
             %Display Candidate
             assert(length(idx)==1, 'Only one frame can be displayed at once');
-            [idx] = Core.HIVMovie.checkFrame(idx,obj.raw.movInfo.nFrame);
+            [idx] = Core.HIVMovie.checkFrame(idx,obj.raw.movInfo(1).nFrames);
             assert(~isempty(obj.candidatePos{idx}),'There is no candidate found in that frame, check that you ran the detection for that frame');
             
-            [frame] = obj.getFrame(idx,'part');
+            [frame] = obj.getFrame(idx,'HIV');
             
             nImages = size(frame,3);
             
@@ -370,7 +382,7 @@ classdef HIVParticleMovie < Core.HIVMovie
             %display particles (after consolidation), On top of the
             %localization, consolidated particles are circled.
             assert(length(idx)==1, 'Only one frame can be displayed at once');
-            [idx] = Core.HIVMovie.checkFrame(idx,obj.raw.movInfo.nFrame);
+            [idx] = Core.HIVMovie.checkFrame(idx,obj.raw.movInfo(1).nFrames);
             % Show Candidate
             obj.showCandidate(idx,10);
             
@@ -416,7 +428,7 @@ classdef HIVParticleMovie < Core.HIVMovie
                     end
                     %Here we display a zoom onto the particle visible on
                     %the specific frame onto the consolidated planes
-                    [frame] = getFrame(obj,idx,'part');
+                    [frame] = getFrame(obj,idx,'HIV');
                    
                     for i = 1:nParticles
                         
@@ -448,7 +460,7 @@ classdef HIVParticleMovie < Core.HIVMovie
         function [candidateList] = planeConsolidation(obj,candMet,focusMetric,consThresh)
             %Loop through all candidate of a given frame and match them
             %between frame until none can be match or all are matched.
-            nPlanes = obj.raw.movInfo.nPlane;
+            nPlanes = obj.raw.movInfo.nPlanes;
             counter = 1;
             nPart = 0;
             maxIt = size(candMet,1);
@@ -553,12 +565,12 @@ classdef HIVParticleMovie < Core.HIVMovie
             [checkRes1] = Core.HIVParticleMovie.checkEuDist([current.row, current.col],...
                 [next.row, next.col],thresh);
             
-            if strcmp(zMethod,'PSFE')
+            if strcmpi(zMethod,'PSFE')
              % Test ellipticity
                 [checkRes2] = Core.HIVParticleMovie.checkEllipticity(current.ellip,...
                 next.ellip,direction);
             
-            elseif or(strcmp(zMethod,'Intensity'),strcmp(zMethod,'3DFit'))
+            elseif or(strcmpi(zMethod,'Intensity'),strcmpi(zMethod,'3DFit'))
                 %we do not test ellipticity here
                 checkRes2 = checkRes1;
                 
@@ -631,7 +643,7 @@ classdef HIVParticleMovie < Core.HIVMovie
             %Here we will check that the consolidation found based on the
             %best focused particle make sense with what we would expect and
             %also that we have enough planes.
-            if or(strcmp(zMethod,'Intensity'),strcmp(zMethod,'3DFit'))
+            if or(strcmpi(zMethod,'Intensity'),strcmpi(zMethod,'3DFit'))
                 if nPlanes ==1
                     testPlanes = true;
                 else
@@ -764,7 +776,7 @@ classdef HIVParticleMovie < Core.HIVMovie
                         candidate = load([file2Analyze(1).folder filesep 'candidatePos.mat']);
                         candidate = candidate.candidate;
                         
-                        if size(candidate,1)== obj.raw.movInfo.nFrame
+                        if size(candidate,1)== obj.raw.movInfo(1).nFrames
                             run = false;
                         else
                            disp('Detection missing in some frames, rerunning detection');
@@ -837,66 +849,72 @@ classdef HIVParticleMovie < Core.HIVMovie
         
         %Methods linked to Candidate
         function [candidate] = detectCandidate(obj,detectParam,frames)
-            assert(isfolder(obj.raw.movInfo.path2Part),'Need to run loadData before findCandidate');
-            assert(isstruct(detectParam),'Detection parameter should be a struct with two fields');
-            nFrames = length(frames);
-            currentCandidate = obj.candidatePos;
-            
-            if(isempty(currentCandidate))
-                
-                candidate = cell(obj.raw.movInfo.nFrame,1);
-                
-            else
-                
-                candidate = currentCandidate;
-                
-            end
-            
-            %parameter for localization
-            FWHM_pix = obj.info.FWHM_px;
-            delta  = detectParam.delta;
-            chi2   = detectParam.chi2;
-            h = waitbar(0,'detection of candidates...');
-            
-            for i = 1 : 1:nFrames
-                
-                position = table(zeros(500,1),zeros(500,1),zeros(500,1),...
-                    zeros(500,1),'VariableNames',{'row', 'col', 'meanFAR','plane'});
-                [volIm] = obj.getFrame(frames(i),'part');
-                nPlanes = size(volIm,3);
-                
-                for j = 1:nPlanes
-                    currentIM = volIm(:,:,j);
-                    %localization occurs here
-                    [ pos, meanFAR, ~ ] = Localization.smDetection(currentIM,...
-                        delta, FWHM_pix, chi2 );
-                    if ~isempty(pos)
-                        startIdx = find(position.row==0,1,'First');
-                        if isempty(startIdx)
-                            startIdx = length(position.row)+1;
-                        end
-                        pos(:,3) = meanFAR;
-                        pos(:,4) = j;
-                        position(startIdx:startIdx+size(pos,1)-1,:) = array2table(pos);
-                    else
-                    end
-                end
-                
-                idx = find(position.row==0,1,'First');
-                if isempty(idx)
-                    
-                    candidate{frames(i)} = position;
-                    
+            idxHIV = contains({obj.raw.movInfo.datatype},'HIV');
+            if sum(idxHIV) == 0
+                obj.candidatePos = [];
+                warning('There was no HIV data so we aborted localization');
+            elseif sum(idxHIV) == 1
+               
+                assert(isstruct(detectParam),'Detection parameter should be a struct with two fields');
+                nFrames = length(frames);
+                currentCandidate = obj.candidatePos;
+
+                if(isempty(currentCandidate))
+
+                    candidate = cell(obj.raw.movInfo(1).nFrames,1);
+
                 else
-                    
-                    candidate{frames(i)} = position(1:idx-1,:);
-                    
+
+                    candidate = currentCandidate;
+
                 end
-                waitbar(i/nFrames,h,...
-                    sprintf('detection of candidates in Frame %d/%d done',i,nFrames));
+
+                %parameter for localization
+                FWHM_pix = obj.info.FWHM_px;
+                delta  = detectParam.delta;
+                chi2   = detectParam.chi2;
+                h = waitbar(0,'detection of candidates...');
+
+                for i = 1 : 1:nFrames
+
+                    position = table(zeros(500,1),zeros(500,1),zeros(500,1),...
+                        zeros(500,1),'VariableNames',{'row', 'col', 'meanFAR','plane'});
+                    [volIm] = obj.getFrame(frames(i),'HIV');
+                    nPlanes = size(volIm,3);
+
+                    for j = 1:nPlanes
+                        currentIM = volIm(:,:,j);
+                        %localization occurs here
+                        [ pos, meanFAR, ~ ] = Localization.smDetection(currentIM,...
+                            delta, FWHM_pix, chi2 );
+                        if ~isempty(pos)
+                            startIdx = find(position.row==0,1,'First');
+                            if isempty(startIdx)
+                                startIdx = length(position.row)+1;
+                            end
+                            pos(:,3) = meanFAR;
+                            pos(:,4) = j;
+                            position(startIdx:startIdx+size(pos,1)-1,:) = array2table(pos);
+                        else
+                        end
+                    end
+
+                    idx = find(position.row==0,1,'First');
+                    if isempty(idx)
+
+                        candidate{frames(i)} = position;
+
+                    else
+
+                        candidate{frames(i)} = position(1:idx-1,:);
+
+                    end
+                    waitbar(i/nFrames,h,...
+                        sprintf('detection of candidates in Frame %d/%d done',i,nFrames));
+                end
+
+                close(h);
             end
-            
-            close(h);
         end
                 
         function [candMet] = superResLocFit(obj,data,frameCandidate,roiSize)
@@ -911,7 +929,7 @@ classdef HIVParticleMovie < Core.HIVMovie
                     zeros(size(frameCandidate,1),1),zeros(size(frameCandidate,1),1),...
                     zeros(size(frameCandidate,1),1),zeros(size(frameCandidate,1),1),...
                     'VariableNames',varNames);
-                sigSetup = [obj.info.sigma_px obj.info.sigma_px];
+            sigSetup = [obj.info.FWHM_px/2.355 obj.info.FWHM_px/2.355];
                 
             for i = 1:size(frameCandidate,1)
                 

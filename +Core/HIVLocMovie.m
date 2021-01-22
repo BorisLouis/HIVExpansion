@@ -133,7 +133,9 @@ classdef HIVLocMovie < Core.HIVParticleMovie
                     fit = polyval(zCal.calib{currentPlane,1},zVec);
 
                 case 'spline'
+                    
                     fit = ppval(zCal.calib{currentPlane,2},zVec);
+                    
             end
 
             %find the index of the value the closest to the particle

@@ -58,13 +58,16 @@ classdef HIVMovie < handle
                    movInfo(i).Width = movI.Width;
                    movInfo(i).Length = movI.Length;           
                    movInfo(i).nFrames = movI.nFrames;
+                   movInfo(i).nPlanes = movI.nPlanes;
                    movInfo(i).zSpacing = movI.zSpacing;
-
+                   movInfo(i).zPosition = [0:movI.nFrames-1]*movI.zSpacing;
+                    
                 end
                 warning('on')
 
                 obj.raw.ext = raw{2};
                 obj.raw.movInfo = movInfo;
+                obj.raw.path = raw{1};
             else
                 assert(isstruct(raw),'raw info is supposed to be a struct');
                 obj.raw =raw;
@@ -99,19 +102,19 @@ classdef HIVMovie < handle
             prompt = {'FWHM(px)','pxSize(nm)'}';
             dlgTitle = 'Information about experimental parameters';
             numLines = 1;
-            defaultVal = {'2','100'};
+            defaultVal = {'4','100'};
             answer = inputdlg(prompt,dlgTitle,numLines,defaultVal);
             
             assert(~isempty(answer),'User canceled input dialog, Simulation was aborted')
             
-            FWHM_pix = str2double(answer(1));
-            assert(~isnan(FWHM_pix),'FWHM should be numerical');
+            FWHM_px = str2double(answer(1));
+            assert(~isnan(FWHM_px),'FWHM should be numerical');
             
             pxSize = str2double(answer(1));
-            assert(~isnan(FWHM_pix),'FWHM should be numerical');
+            assert(~isnan(pxSize),'pxSize should be numerical');
             
             obj.info.pxSize = pxSize;
-            obj.info.FWHM_pix = FWHM_pix;
+            obj.info.FWHM_px = FWHM_px;
             
         end
         

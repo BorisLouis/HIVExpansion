@@ -14,7 +14,8 @@ idx2 = strfind(desc,'slices=');
 
 nImages = str2double(desc(idx1+7:idx2-1));
 
-movieInfo.nFrames = nImages;
+movieInfo.nPlanes = nImages;
+movieInfo.nFrames = 1;
 idx1 = strfind(desc,'spacing=');
 idx2 = strfind(desc,'loop');
 
@@ -25,6 +26,7 @@ else
 end
 
 movieInfo.zSpacing = zSpacing;
+
 
 tObj.close
 

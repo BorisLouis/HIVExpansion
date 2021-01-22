@@ -11,18 +11,29 @@ clc
 %% User Input
 path = 'D:\Documents\Unif\PhD\2021-Data\19\LaminHIV'; %give empty brackets [], to open file selection
 ext = '.tif'; %expected extension of the movie(s);
-info = []; %placeholder for future information potentially needed
-
+info.runMethod = 'load'; %'load'or 'run', if load is chosen it will try to load previously calculated data(e.g localized particles)
+info.fitMethod = 'phasor'; %'Gauss' or 'phasor'
+info.zMethod   = 'Intensity';
+%if it exist. run will always re-run the analysis and erase previous data.
 
 %% Data Loading
 
-HIVData = Core.HIVMovie(ext,info,path);
+HIVData = Core.HIVParticleMovie(ext,info,path);
 
-HIVData.getExtraInfo()
+HIVData.getExtraInfo();
 
-%% Data Processing
+%% Particle detection
+%rough detection of particle
+detectParam.delta = 6; % ROI around the molecule for testing
+detectParam.chi2  = 60;% Threshold for detections ([24-80],24 for single molecules, up to 80 for brighter objects
+HIVData.findCandidatePos(detectParam);
 
+HIVData.showCandidate(1,5);
 
+%% Localization
+%Fitting for accurate localization of the detected particle
+HIVData.SRLocalizeCandidate();
 
-
-
+%% consolidation of particle position
+%check that particle are detected in more than one z-slice
+HIVData.consolidatePlanes();
