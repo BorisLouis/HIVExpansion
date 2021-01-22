@@ -129,100 +129,8 @@ classdef HIVMovie < handle
             obj.info.dZ = dZ;
             
         end
-        
-        function loadData(obj,chInfo)
-            
-            ext = lower(obj.raw.ext);
-            path = obj.raw.path;
-            [file2Analyze] = Core.HIVMovie.getFileInPath(path,ext);
-            nDir = [file2Analyze(1).folder,filesep 'calibrated'];
-            if ~isfolder(nDir)
-                mkdir(nDir);
-            end
-            if isempty(file2Analyze)
-                warning('Did not find any file of the extension provided in the folder provided');
-            end
-            extNoDot = strrep(ext,'.','');            
-            endFile = file2Analyze(end).name;
-            movInfo = Load.Movie.(extNoDot).getInfo([file2Analyze(1).folder filesep endFile]);
-            
-            path2Files = [file2Analyze.folder filesep file2Analyze.name,'.files'];
-            f2Read = dir(path2Files);
-            idx2Tif = contains({f2Read.name},'.tif');
-            f2Read = f2Read(idx2Tif);
-            
-            exFile = f2Read(1).name;
-                        
-            %getIdx
-            idx1 = strfind(exFile,'T');
-            idx2 = strfind(exFile,'Z');
-            idx3 = strfind(exFile,'C');
-            idx4 = strfind(exFile,'.tif');
-            %check if previous data was found
-            try
-                test = Core.HIVMovie.getFileInPath([nDir filesep 'part'],'.tif');
-            catch ME
-                if strcmp(ME.message,'The path given is not a folder')
-                    test=0;
-                else
-                    error(ME.message)
-                end
-            end
-            %if we found data
-            if length(test) == movInfo.nPlane
-                disp('Previous data found, loading from existing file');
-                fileName = [nDir filesep 'cell'];
-                movInfo.path2Cell = fileName;
-                fileName = [nDir filesep 'part'];
-                movInfo.path2Part = fileName;
-
-            else
-            
-                partData = zeros(movInfo.Length,movInfo.Width,movInfo.nPlane,movInfo.nFrame,'uint16');
-                cellData = partData;
-
-                h= waitbar(0,'Separating data channel');
-                for i = 1 : movInfo.totFrame
-                    currentFile = [f2Read(i).folder filesep f2Read(i).name];
-                    currentName = f2Read(i).name;
-                    currentIm   = Load.Movie.tif.getFrames(currentFile,1);
-
-                    cFrame = str2double(currentName(idx1+1:idx4-1));
-                    cPlane = str2double(currentName(idx2+1:idx1-1));
-                    cChan  = str2double(currentName(idx3+1:idx2-1));
-
-                    if strcmp(chInfo.(['ch0' num2str(cChan)]),'particles')
-                        partData(:,:,cPlane,cFrame) = currentIm;
-                    elseif strcmp(chInfo.(['ch0' num2str(cChan)]),'cells')
-                        cellData(:,:,cPlane,cFrame) = currentIm;
-                    elseif cChan>2
-                        warning('More than two channels, not considering additional channels')
-                    else
-                        error('Something is wrong, please check data and channel information')
-                    end
-
-                    waitbar(i/movInfo.totFrame,h,'Separating data channel')
-
-                end
-
-                fileName = [nDir filesep 'cell'];
-                obj.saveChannel(cellData,fileName)
-                movInfo.path2Cell = fileName;
-
-                fileName = [nDir filesep 'part'];
-                obj.saveChannel(partData,fileName)
-                movInfo.path2Part = fileName;
-                close(h);
-            end
-            
-            movInfo.dataDir   = nDir;
-            dZ = obj.info.dZ;
-            movInfo.planePos = 0:dZ:(movInfo.nPlane-1)*dZ;
-            
-            obj.raw.movInfo = movInfo;
-                       
-        end     
     end
+        
     methods (Static)
         function [frames]       = checkFrame(frames,maxFrame)
             %Short method that make sure that the frame are making sense.
@@ -280,32 +188,5 @@ classdef HIVMovie < handle
                 ext = [lower(ext2),lower(ext1)];
             end
         end
-    end
-    
-    methods (Access = private)
-       function saveChannel(~,data,calDir)
-            
-            mkdir(calDir);         
-                       
-            for i = 1:size(data,3)
-                data2Store = squeeze(data(:,:,i,:));
-                fName = sprintf('calibratedPlane%d.tif',i);
-              
-                fPathTiff = [calDir filesep fName];
-                
-                t = Tiff(fPathTiff, 'a');
-                
-                if isa(data2Store,'uint32')
-                    t = dataStorage.writeTiff(t,data2Store,32);
-                else
-                    t = dataStorage.writeTiff(t,data2Store,16);
-                end
-                
-                t.close;
-                
-            end
-            
-        end 
-    
     end
 end
