@@ -9,15 +9,15 @@ classdef HIVLocMovie < Core.HIVParticleMovie
     
     methods
         
-        function obj = HIVLocMovie(raw,info)
+        function obj = HIVLocMovie(ext,info,varargin)
             
-            obj  = obj@Core.HIVParticleMovie(raw,info);
+            obj  = obj@Core.HIVParticleMovie(ext,info,varargin{1});
            
         end
   
         function [locPos] = getLocPos(obj,frames)
              %Extract the position of the candidate of a given frame
-            [idx] = Core.HIVMovie.checkFrame(frames, obj.raw.movInfo.nFrame);
+            [idx] = Core.HIVMovie.checkFrame(frames, obj.raw.movInfo(1).nFrames);
             locPos = obj.corrLocPos{idx};
             
             if isempty(locPos)
@@ -29,84 +29,89 @@ classdef HIVLocMovie < Core.HIVParticleMovie
                 
         function superResolve(obj)
             disp('super resolving positions ... ');
-            
-            %Check if some particle were super resolved already:
-            [run,SRList] = obj.existZResParticles(obj.info.runMethod,obj.raw.movInfo.Path,'.mat');
-           
-            if run
-                data2Resolve = obj.particles.List;
-                nPlanes = obj.raw.movInfo.nPlane;
-                nParticles = sum(obj.particles.nParticles);
-                pxSize = obj.raw.movInfo.pxSize;
-                SRList = table(zeros(nParticles,1),...
-                        zeros(nParticles,1), zeros(nParticles,1), zeros(nParticles,1),...
-                        zeros(nParticles,1), zeros(nParticles,1), zeros(nParticles,1),...
-                        zeros(nParticles,1), zeros(nParticles,1), zeros(nParticles,1),...
-                        'VariableNames',{'row','col','z','intZ','rowM',...
-                        'colM','zM','intensity','SNR','t'});
-                nFrames = length(data2Resolve);
-                h = waitbar(0,'SuperResolving position...');
+            if isempty(obj.particles)
+                warning('no HIV files found or no particles found, aborting localization');
+            else
                 
-                for i = 1:nFrames
+                %Check if some particle were super resolved already:
+                [run,SRList] = obj.existZResParticles(obj.info.runMethod,obj.raw.path,'.mat');
 
-                    frameData = data2Resolve{i};
-                    frameData2Store = table(zeros(size(frameData)),...
-                        zeros(size(frameData)),zeros(size(frameData)),zeros(size(frameData)),...
-                        zeros(size(frameData)),zeros(size(frameData)),zeros(size(frameData)),...
-                        zeros(size(frameData)),zeros(size(frameData)),zeros(size(frameData)),...
-                        'VariableNames',{'row','col','z','intZ','rowM','colM',...
-                        'zM','intensity','SNR','t'});
-                    
-                    fData = obj.getFrame(i,'part'); 
-                    for j = 1:length(frameData)
+                if run
+                    data2Resolve = obj.particles.List;
+                    nPlanes = obj.raw.movInfo.nPlanes;
+                    nParticles = sum(obj.particles.nParticles);
+                    pxSize = obj.info.pxSize;
+                    SRList = table(zeros(nParticles,1),...
+                            zeros(nParticles,1), zeros(nParticles,1), zeros(nParticles,1),...
+                            zeros(nParticles,1), zeros(nParticles,1), zeros(nParticles,1),...
+                            zeros(nParticles,1), zeros(nParticles,1), zeros(nParticles,1),...
+                            'VariableNames',{'row','col','z','intZ','rowM',...
+                            'colM','zM','intensity','SNR','t'});
+                    nFrames = length(data2Resolve);
+                    h = waitbar(0,'SuperResolving position...');
 
-                        partData = frameData{j};
+                    for i = 1:nFrames
 
-                        
-                        switch obj.info.zMethod
-                            case 'Intensity'
-                                if nPlanes ==1
-                                    row  = partData.row(3)*pxSize;
-                                    col  = partData.col(3)*pxSize;
-                                    z    = partData.z(3);
-                                    rowM = partData.row(3)*pxSize;
-                                    colM = partData.col(3)*pxSize;
-                                    zM   = partData.z(3);
-                                    intZ = partData.intensity;
-                                    data = table(row,col,z,intZ,rowM,colM,zM,...
-                       'VariableNames',{'row','col','z','intZ','rowM','colM','zM'});
+                        frameData = data2Resolve{i};
+                        frameData2Store = table(zeros(size(frameData)),...
+                            zeros(size(frameData)),zeros(size(frameData)),zeros(size(frameData)),...
+                            zeros(size(frameData)),zeros(size(frameData)),zeros(size(frameData)),...
+                            zeros(size(frameData)),zeros(size(frameData)),zeros(size(frameData)),...
+                            'VariableNames',{'row','col','z','intZ','rowM','colM',...
+                            'zM','intensity','SNR','t'});
 
-                                else
+                        fData = obj.getFrame(i,'HIV'); 
+                        for j = 1:length(frameData)
 
-                               
-                                [data] = obj.resolveXYZInt(partData(:,{'row','col','z','ellip','plane'}),fData);
-                                end
-                            otherwise
-                                error('Unknown method for z extraction requested')
+                            partData = frameData{j};
+
+
+                            switch obj.info.zMethod
+                                case 'Intensity'
+                                    if nPlanes ==1
+                                        row  = partData.row(3)*pxSize;
+                                        col  = partData.col(3)*pxSize;
+                                        z    = partData.z(3);
+                                        rowM = partData.row(3)*pxSize;
+                                        colM = partData.col(3)*pxSize;
+                                        zM   = partData.z(3);
+                                        intZ = partData.intensity;
+                                        data = table(row,col,z,intZ,rowM,colM,zM,...
+                           'VariableNames',{'row','col','z','intZ','rowM','colM','zM'});
+
+                                    else
+
+
+                                    [data] = obj.resolveXYZInt(partData(:,{'row','col','z','ellip','plane'}),fData);
+                                    end
+                                otherwise
+                                    error('Unknown method for z extraction requested')
+
+                            end
+
+                            frameData2Store(j,{'row','col','z','intZ','rowM','colM','zM'}) = data;
+                            frameData2Store.intensity(j) = partData.intensity(3);
+                            frameData2Store.SNR(j) = partData.SNR(3);
+                            frameData2Store.t(j) = i;
 
                         end
-
-                        frameData2Store(j,{'row','col','z','intZ','rowM','colM','zM'}) = data;
-                        frameData2Store.intensity(j) = partData.intensity(3);
-                        frameData2Store.SNR(j) = partData.SNR(3);
-                        frameData2Store.t(j) = i;
-
+                    startIdx = find(SRList.row==0,1);   
+                    SRList(startIdx:startIdx+height(frameData2Store)-1,:) = frameData2Store;   
+                    waitbar(i/nFrames,h,['SuperResolving positions: frame ' num2str(i) '/' num2str(nFrames) ' done']);
                     end
-                startIdx = find(SRList.row==0,1);   
-                SRList(startIdx:startIdx+height(frameData2Store)-1,:) = frameData2Store;   
-                waitbar(i/nFrames,h,['SuperResolving positions: frame ' num2str(i) '/' num2str(nFrames) ' done']);
+                    close(h);
+                    %clean up the list
+                    SRList(isnan(SRList.row),:) = [];
                 end
-                close(h);
-                %clean up the list
-                SRList(isnan(SRList.row),:) = [];
+
+                obj.particles.SRList = SRList;
+                particle = obj.particles;
+                %Save the data
+                fileName = sprintf('%s%sparticle.mat',obj.raw.path,'\');
+                save(fileName,'particle');
+                disp('========> DONE ! <=========');
+                
             end
-            
-            obj.particles.SRList = SRList;
-            particle = obj.particles;
-            %Save the data
-            fileName = sprintf('%s%sparticle.mat',obj.raw.movInfo.Path,'\');
-            save(fileName,'particle');
-            disp('========> DONE ! <=========');
             
         end       
     end
@@ -155,12 +160,12 @@ classdef HIVLocMovie < Core.HIVParticleMovie
         function [data] = resolveXYZInt(obj,partData,frameData)
             planes2Fit =5;
             nPlanes = size(frameData,3);
-            pxSize = obj.raw.movInfo.pxSize;
+            pxSize = obj.info.pxSize;
             ROIRad = ceil(obj.info.FWHM_px/2+1);
             planes  = partData(~isnan(partData.plane),:).plane;
 
             bf = partData.plane(3);
-            planePos = obj.raw.movInfo.planePos;
+            planePos = obj.raw.movInfo(1).planePos*1000;
             
             %Get ROI XZ, YZ scaled to same pixel size
             [Mag] = Core.HIVLocMovie.getZPhasorMag(partData,ROIRad,frameData);
@@ -199,7 +204,7 @@ classdef HIVLocMovie < Core.HIVParticleMovie
               
                 row = partData.row(3)*pxSize;
                 col = partData.col(3)*pxSize;
-                zM = z/mean(diff(obj.raw.movInfo.planePos));                      
+                zM = z/mean(diff(obj.raw.movInfo(1).planePos));                      
                 rowM = partData.row(3);
                 colM = partData.col(3);
                 intZ = fit(3);

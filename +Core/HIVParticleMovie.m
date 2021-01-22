@@ -48,7 +48,7 @@ classdef HIVParticleMovie < Core.HIVMovie
             warning('off')
             for i =1:size(frame,3)
                 
-               frame(:,:,i) = Load.Movie.tif.getFrames(path,idx);
+               frame(:,:,i) = Load.Movie.tif.getFrames(path,i);
                
             end
             warning('on')
@@ -77,7 +77,7 @@ classdef HIVParticleMovie < Core.HIVMovie
             [run, candidate] = obj.existCandidate(obj.raw.path, '.mat');
             
             %if we only ask 1 frame we always run
-            if length(frames) == 1
+            if and(length(frames) == 1,~length(frames)==obj.raw.movInfo(1).nFrames);
                 run = true;
             end
             if run

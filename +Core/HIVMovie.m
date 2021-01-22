@@ -60,7 +60,7 @@ classdef HIVMovie < handle
                    movInfo(i).nFrames = movI.nFrames;
                    movInfo(i).nPlanes = movI.nPlanes;
                    movInfo(i).zSpacing = movI.zSpacing;
-                   movInfo(i).zPosition = [0:movI.nFrames-1]*movI.zSpacing;
+                   movInfo(i).planePos = [0:movI.nPlanes-1]*movI.zSpacing;
                     
                 end
                 warning('on')
