@@ -9,7 +9,7 @@ close all
 clc
 
 %% User Input
-path = 'D:\Documents\Unif\PhD\2021-Data\19\Lamina-NUP\cell1'; %give empty brackets [], to open file selection
+path = 'D:\Documents\Unif\PhD\2021-Data\19\LaminHIV'; %give empty brackets [], to open file selection
 ext = '.tif'; %expected extension of the movie(s);
 info = []; %placeholder for future information potentially needed
 

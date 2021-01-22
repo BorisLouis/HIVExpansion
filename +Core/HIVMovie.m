@@ -39,32 +39,37 @@ classdef HIVMovie < handle
         
         function set.raw(obj,raw)
             
-            assert(isfolder(raw{1}),'The path provided does not appear to exist');
-            assert(ischar(raw{2}),'Extension needs to be a string');
-            obj.checkExtension(raw{2});
+            if iscell(raw)
+                assert(isfolder(raw{1}),'The path provided does not appear to exist');
+                assert(ischar(raw{2}),'Extension needs to be a string');
+                obj.checkExtension(raw{2});
             
             
-            [files] = obj.getFileInPath(raw{1},raw{2});
-            ext = strrep(raw{2},'.','');
-            movInfo = struct();
-            warning('off')
-            
-            for i = 1:length(files)
-               [movI] = Load.Movie.(ext).getInfo([files(i).folder filesep files(i).name]); 
-               
-               movInfo(i).path = [files(i).folder filesep files(i).name];
-               movInfo(i).fileName = [files(i).name];
-               movInfo(i).Width = movI.Width;
-               movInfo(i).Length = movI.Length;           
-               
-               
+                [files] = obj.getFileInPath(raw{1},raw{2});
+                ext = strrep(raw{2},'.','');
+                movInfo = struct();
+                warning('off')
+
+                for i = 1:length(files)
+                   [movI] = Load.Movie.(ext).getInfo([files(i).folder filesep files(i).name]); 
+
+                   movInfo(i).path = [files(i).folder filesep files(i).name];
+                   movInfo(i).fileName = [files(i).name];
+                   movInfo(i).Width = movI.Width;
+                   movInfo(i).Length = movI.Length;           
+                   movInfo(i).nFrames = movI.nFrames;
+                   movInfo(i).zSpacing = movI.zSpacing;
+
+                end
+                warning('on')
+
+                obj.raw.ext = raw{2};
+                obj.raw.movInfo = movInfo;
+            else
+                assert(isstruct(raw),'raw info is supposed to be a struct');
+                obj.raw =raw;
             end
-            warning('on')
-            
-            obj.raw.ext = raw{2};
-            obj.raw.movInfo = movInfo;          
-            
-            
+
         end
         
         function getExtraInfo(obj)
@@ -74,15 +79,21 @@ classdef HIVMovie < handle
                 name = movInfo(i).fileName;                
                 
                 for j = 1:length(datatype)
-                    chk = contains(name,datatype{i},'IgnoreCase',true);
+                    chk = contains(name,datatype{j},'IgnoreCase',true);
                     if chk
-                        obj.raw.movInfo(i).datatype = datatype{i};
+                        obj.raw.movInfo(i).datatype = datatype{j};
                         break;
                                                         
                     end
                 end
             end
+            % here we check that there is only one file per datatype
+            dataT = {obj.raw.movInfo.datatype};
             
+            assert(isequal(sort(dataT), unique(dataT)),['Found more than one '...
+                'file per datatype, please check directory and filenames, '...
+                'Expect only one or zero of each of these files: NUP,Lamina,HIV,Lipid'])
+                        
             disp(['We have detected ' num2str(length(movInfo)) ' files, please fill in the additional information']);
             
             prompt = {'FWHM(px)','pxSize(nm)'}';
