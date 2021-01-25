@@ -49,4 +49,6 @@ HIVData.segmentLamina();
 %% Segmentation of NUP
 HIVData.segmentNUP();
 
+%% Segmentation of Lipid
+HIVData.segmentLipid()
 
