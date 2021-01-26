@@ -43,12 +43,19 @@ HIVData.superResolve();
 
 
 %% Segmentation of Lamina
- 
+membrane = 'lamina';
 HIVData.segmentLamina();
-
+HIVData.showMembrane(membrane);
 %% Segmentation of NUP
 HIVData.segmentNUP();
 
 %% Segmentation of Lipid
 HIVData.segmentLipid()
+
+%% get membrane position 
+membrane = 'lamina';
+HIVData.getMembranePos(membrane);
+
+
+
 
