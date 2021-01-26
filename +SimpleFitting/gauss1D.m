@@ -9,6 +9,7 @@ switch nargin
     case 3
         sigGuess = guess.sig;
         muGuess  = guess.mu;
+        minMaxDom = guess.minMaxDomain;
     otherwise
         error('wrong number of arguments');
 end
@@ -18,8 +19,8 @@ domain =domain(:);
 [val,ind] = max(A);
 
 %                   Sigma                       mu             A        y0           
-lb        = [abs(domain(1)-domain(2))/10     min(domain)-0.1*max(abs(domain))     0        0];
-ub        = [abs(domain(1)-domain(2))*20     max(domain)+0.1*max(abs(domain))     3*val      val];
+lb        = [abs(domain(1)-domain(2))/10     min(minMaxDom)     0        0];
+ub        = [abs(domain(1)-domain(2))*20     max(minMaxDom)     3*val      val];
 initguess = [      sigGuess                  muGuess                          val-min(A) min(A)];
 opts = optimset('Display','off');
 FitPar=lsqcurvefit(@SimpleFitting.gaussian,initguess,domain,A,lb,ub,opts);

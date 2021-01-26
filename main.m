@@ -55,7 +55,8 @@ HIVData.segmentLipid()
 %% get membrane position 
 membrane = 'lamina';
 HIVData.getMembranePos(membrane);
-
+%%
+HIVData.showMembrane(membrane,4);
 
 
 

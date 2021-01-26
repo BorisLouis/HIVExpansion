@@ -199,7 +199,7 @@ classdef HIVCellMovie < Core.HIVLocMovie
         
         function showMembrane(obj,membrane,idx)
             %get membrane data
-            [data,~,contour] = getMembrane(obj,membrane);
+            [data,~,contour,fitMembrane] = getMembrane(obj,membrane);
             
             
             if nargin<3
@@ -215,6 +215,10 @@ classdef HIVCellMovie < Core.HIVLocMovie
                 colormap('hot')
                 plot(contour{idx}{1}(:,2),contour{idx}{1}(:,1),'w','Linewidth',2);
                 plot(contour{idx}{2}(:,2),contour{idx}{2}(:,1),'w','Linewidth',2);
+                if ~isempty(fitMembrane)
+                    plot(fitMembrane{idx}(:,2),fitMembrane{idx}(:,1),'g','Linewidth',2);
+                end
+                
                 title([membrane ' staining'])
                 xlabel('Pixels')
                 ylabel('Pixels')
@@ -273,14 +277,16 @@ classdef HIVCellMovie < Core.HIVLocMovie
 
                         if xVec(1)-xVec(2) ==0
                             vec2Use = yVec;
+                            minMax  = [y(1) y(2)];
                         else
                             vec2Use = xVec;
+                            minMax  = [x(1) x(2)];
                         end
 
                         [~,id] = max(pxLine);
                         guess.sig = 10;
                         guess.mu  = vec2Use(id);
-
+                        guess.minMaxDomain = minMax;
 
 
                         [gPar, Fit] = SimpleFitting.gauss1D(pxLine,vec2Use,guess);
@@ -322,7 +328,7 @@ classdef HIVCellMovie < Core.HIVLocMovie
         end
         
         
-        function [data,mask,contour] = getMembrane(obj,membrane)
+        function [data,mask,contour,membranePos] = getMembrane(obj,membrane)
             idx = contains({obj.raw.movInfo.fileName},membrane,'IgnoreCase',true);
             
             if sum(idx)~=1
@@ -336,17 +342,31 @@ classdef HIVCellMovie < Core.HIVLocMovie
                 
                 switch lower(membrane)
                     case 'lamina'
-                        contour = obj.Lamina.contour;
-                        mask    = obj.Lamina.mask;
+                        
+                        var = 'Lamina';
+                    
                     case 'nup'
-                        contour = obj.NUP.contour;
-                        mask    = obj.NUP.mask;
+                        
+                        var = 'NUP';
+                    
                     case 'lipid'
-                        contour = obj.lipid.contour;
-                        mask    = obj.lipid.mask;
+                        
+                        var = 'lipid';
+                    
                     otherwise
+                        
                         error('Unknown membrane requested')
+                
                 end
+                
+                contour = obj.(var).contour;
+                mask    = obj.(var).mask;
+                if isfield(obj.(var),'membranePos')
+                    membranePos = obj.(var).membranePos;
+                else
+                    membranePos = [];
+                end
+                
             end
         end
         
