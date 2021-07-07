@@ -3,8 +3,8 @@ classdef HIVCellMovie < Core.HIVLocMovie
         Lamina
         NUP
         Lipid
-        
-        
+        RedLipid
+                
     end
     
     
@@ -197,9 +197,104 @@ classdef HIVCellMovie < Core.HIVLocMovie
             
         end
         
+        function [finalBW] = segmentRedLipid(obj)
+            idx = contains({obj.raw.movInfo.fileName},'lipid','IgnoreCase',true);
+            
+            if sum(idx)~=1
+                warning('no lipid file was found, operation aborted');
+                
+            else
+                data = obj.getFrame(1,'lipid');
+                
+                % Gaussian filtering
+                S = 2;
+                % size of pixel in z vs x/y
+                zFactor = obj.raw.movInfo(1).zSpacing/obj.info.pxSize;
+                sigma = [S,S,S/zFactor];
+                IMs = imgaussfilt3(data, sigma);
+                disp('DONE with filtering ------------')
+                threshold = adaptthresh(uint16(IMs),0.8,'neigh',[301 301 3]);
+                gBW = imbinarize(uint16(IMs),threshold);
+                gBW = bwareaopen(gBW,10000);
+%                 se = strel('disk',10);
+%                 gBW = imclose(gBW,se);
+                
+                % invert
+                invertBW = imcomplement(gBW);
+                invertBW = bwareaopen(invertBW,20000);
+                
+                for i = 1:size(invertBW,3)
+                    invertBW(:,:,i) = imclearborder(invertBW(:,:,i));
+                    invertBW(:,:,i) = imfill(invertBW(:,:,i),'holes');
+                end
+                
+                % find the biggest round object common in middle plane
+                BWdata = regionprops(invertBW(:,:,1),{'Area','PixelIdxList','MajorAxisLength','MinorAxisLength'});
+                
+                for i =1:length(BWdata)
+                    currData = BWdata(i);
+                    
+                    calcR = (currData.MajorAxisLength+currData.MinorAxisLength)/2;
+                    
+                    expectedDiskArea = pi*(calcR/2)^2;
+                    
+                    BWdata(i).roundness = BWdata(i).Area/expectedDiskArea;
+                    
+                    
+                end
+                
+                roundBW = BWdata([BWdata.roundness]>0.85);
+                
+                biggestRoundBW = roundBW([roundBW.Area] == max([roundBW.Area]));
+                
+                volBWData = regionprops3(invertBW,'VoxelIdxList');
+                finalIDX = 0;
+                for i = 1:size(volBWData,1)
+                    currIDX = volBWData.VoxelIdxList{i};
+                    
+                    if all(ismember(biggestRoundBW.PixelIdxList,currIDX))
+                        finalIDX = currIDX;
+                        break;
+                    end
+                end
+                
+                
+                if finalIDX ~=0
+                else
+                    error('Something went wrong in the calculation')
+                end
+                
+                disp('Extracting Contour')
+                
+                finalBW = zeros(size(gBW));
+                finalBW(finalIDX) = 1;
+                
+                for i = 1:size(finalBW,3)
+                    %Need to make a second make 2pixel bigger than the first
+                    se = strel('disk',20);
+                    biggerMask = imdilate(finalBW(:,:,i),se);
+                    
+                    finalBW(:,:,i)  =  biggerMask-finalBW(:,:,i);
+                    
+                    
+                end
+                
+                %TODO BW CHECK
+                
+                %here we obtain the cell contour
+                contour = obj.getContour(finalBW);
+                
+                obj.Lipid.mask = finalBW;
+                obj.Lipid.contour = contour;
+            end
+            
+            
+        end
+        
         function showMembrane(obj,membrane,idx)
             %get membrane data
-            [data,~,contour,fitMembrane] = getMembrane(obj,membrane);
+            data = obj.getFrame(1,membrane);
+            [~,contour,fitMembrane] = getMembrane(obj,membrane);
             
             
             if nargin<3
@@ -231,7 +326,8 @@ classdef HIVCellMovie < Core.HIVLocMovie
         
         function [membrane] = getMembranePos(obj,membrane)
             %get membrane data
-            [data,~,contour] = getMembrane(obj,membrane);
+            data = obj.getFrame(1,membrane);
+            [~,contour,~] = getMembrane(obj,membrane);
             
             if ~isempty(data)
                 membranePos = cell(size(contour));
@@ -248,64 +344,75 @@ classdef HIVCellMovie < Core.HIVLocMovie
                     %loop through the smallest contour
                     for j = 1: length(sContour)
                         currPoint = sContour(j,:);
-
+                       
                         %find closest point in the largest lContour
                         closestList = sqrt((lContour(:,1)-currPoint(:,1)).^2 +...
                             ((lContour(:,2)-currPoint(:,2)).^2));
                         [~,idx] = min(closestList);
                         closestPoint = lContour(idx,:);
-
+                        %create x-y points in order to make a line of pixel
                         x = [currPoint(1,2); closestPoint(1,2)];
                         y = [currPoint(1,1); closestPoint(1,1)];
-
+                        
                         center = [mean(x),mean(y)];
-
+                        %get the slope of the line
                         m = (y(2)-y(1))/(x(2)-x(1));
-
+                        %get the origin of the line
                         b = y(1)-m*x(1);
-
+                        %sort data point base on x axis
                         [x,idx] = sort(x);
-
+                        %store data about the line to be used in next
+                        %function
                         linEq.m = m;
                         linEq.b = b;
                         linEq.x = x;
                         linEq.y = y(idx);
-
+                        %get line of pixel 
                         [idx,xVec,yVec] = obj.getLinePixel(linEq,dim);
 
                         pxLine = currData(idx);
-
-                        if xVec(1)-xVec(2) ==0
+                        %get minimum and maximum of the vector
+                        %check that x is 
+                        if abs(mean(diff(xVec)))< abs(mean(diff(yVec)))
                             vec2Use = yVec;
                             minMax  = [y(1) y(2)];
                         else
                             vec2Use = xVec;
-                            minMax  = [x(1) x(2)];
+                            minMax  = [x(1) x(2)];close all
                         end
 
-                        [~,id] = max(pxLine);
+                        
                         guess.sig = 10;
-                        guess.mu  = vec2Use(id);
+                        guess.mu  = vec2Use(round(length(pxLine)/2));
                         guess.minMaxDomain = minMax;
 
-
+                        try
                         [gPar, Fit] = SimpleFitting.gauss1D(pxLine,vec2Use,guess);
+                        catch
+                        end
+%                                           figure
+%                                           plot(pxLine)
+%                                           hold on
+%                                           plot(Fit)
+%                                           clf
 
-                        %                   figure
-                        %                   plot(pxLine)
-                        %                   hold on
-                        %                   plot(Fit)
-
-                        if xVec(1)-xVec(2) ==0
+                        if abs(mean(diff(xVec))) < abs(mean(diff(yVec)))
                             %then we get y position and x constant
                             fContour(j,1) = gPar(2);
-                            fContour(j,2) = xVec(1);
-
+                            %check that m is not infinite (x == constant)
+                            if abs(m)~=inf
+                                fContour(j,2) = (gPar(2)-b)/m;
+                            else
+                                fContour(j,2) = xVec(1);
+                            end
                         else
                             %then x position from fit and y from equation
                             fContour(j,2) = gPar(2);
                             fContour(j,1) = m*gPar(2)+b;
 
+                        end
+                        if any(isnan(fContour(:)))
+                            error('Something went wrong, need to check the count');
                         end
 
                     end
@@ -325,21 +432,18 @@ classdef HIVCellMovie < Core.HIVLocMovie
                     obj.Lipid.membranePos = membranePos;
             end
             
-        end
+        end      
         
-        
-        function [data,mask,contour,membranePos] = getMembrane(obj,membrane)
+        function [mask,contour,membranePos] = getMembrane(obj,membrane)
             idx = contains({obj.raw.movInfo.fileName},membrane,'IgnoreCase',true);
             
             if sum(idx)~=1
                 warning(['no ' membrane ' file was found, operation aborted']);
-                data = [];
+      
                 mask = [];
                 contour = [];
                 
-            else
-                data = obj.getFrame(1,membrane);
-                
+            else                
                 switch lower(membrane)
                     case 'lamina'
                         
@@ -351,7 +455,7 @@ classdef HIVCellMovie < Core.HIVLocMovie
                     
                     case 'lipid'
                         
-                        var = 'lipid';
+                        var = 'Lipid';
                     
                     otherwise
                         
@@ -368,6 +472,46 @@ classdef HIVCellMovie < Core.HIVLocMovie
                 end
                 
             end
+        end
+        
+        function [partPos] = getHIVToMembraneDistance(obj,membrane)
+            
+            [~,~,memPos] = obj.getMembrane(membrane);
+            partPos = obj.particles.SRList;
+            pxSize = obj.info.pxSize;
+            zPos = obj.raw.movInfo.planePos;
+            zSpacing = obj.raw.movInfo.zSpacing;
+            
+            for i = 1:height(partPos)
+                currPart = partPos(i,:);
+                %check which membrane to use
+                idx2Membrane = ceil(currPart.z/zSpacing);
+                
+                %get the membrane
+                currMembrane = memPos{idx2Membrane}*pxSize;
+                
+                %get sign of distance to membrane by looking if particle is
+                %inside or outside of it, inside will be positive, outside
+                %will be negative
+                
+                minXm = min(currMembrane(:,1));
+                maxXm = max(currMembrane(:,1));
+                minYm = min(currMembrane(:,2));
+                maxYm = max(currMembrane(:,2));
+                
+                if and(and(minXm<currPart.col,maxXm>currPart.col),and(minYm<currPart.row,maxYm>currPart.row))
+                    mult = 1;
+                else
+                    mult = -1;
+                end
+ 
+                partPos.dist2Mem = mult*min(sqrt((currPart.col-currMembrane(:,1)).^2 +(currPart.row-currMembrane(:,2)).^2));
+
+            end
+            
+            
+            
+            
         end
         
         function plotContour3D(obj,frame)
@@ -662,7 +806,7 @@ classdef HIVCellMovie < Core.HIVLocMovie
             %get vector between the two points
             V = pt2-pt1;
             
-            factor_distance = 1;
+            factor_distance = 4;
             
             if diff(x)~=0
                 %recalculate position of vector

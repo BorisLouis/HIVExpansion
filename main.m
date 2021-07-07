@@ -9,7 +9,7 @@ close all
 clc
 
 %% User Input
-path = 'D:\Documents\Unif\PhD\2021-Data\19\Lamina-NUP\cell1'; %give empty brackets [], to open file selection
+path = 'D:\Documents\Unif\PhD\2021-Data\07 - Jul\Aline HIV\DATA Boris\Seperate channels NUP Lamin HIV\Cell1'; %give empty brackets [], to open file selection
 ext = '.tif'; %expected extension of the movie(s);
 info.runMethod = 'load'; %'load'or 'run', if load is chosen it will try to load previously calculated data(e.g localized particles)
 info.fitMethod = 'phasor'; %'Gauss' or 'phasor'
@@ -48,15 +48,26 @@ HIVData.segmentLamina();
 HIVData.showMembrane(membrane);
 %% Segmentation of NUP
 HIVData.segmentNUP();
-
+membrane = 'NUP';
+HIVData.showMembrane(membrane);
 %% Segmentation of Lipid
-HIVData.segmentLipid()
+membrane = 'lipid';
+HIVData.segmentLipid();
+HIVData.showMembrane(membrane);
+%% Segmentation of red lipid
+HIVData.segmentRedLipid();
+
 
 %% get membrane position 
-membrane = 'lamina';
+membrane = 'lipid';
 HIVData.getMembranePos(membrane);
 %%
-HIVData.showMembrane(membrane,4);
+HIVData.showMembrane(membrane,1);
+
+%% Get distance between particles and membrane
+membrane = 'lipid';
+HIVData.getHIVToMembraneDistance(membrane);
+
 
 
 

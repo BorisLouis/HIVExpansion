@@ -155,6 +155,7 @@ classdef HIVLocMovie < Core.HIVParticleMovie
             
             guess.sig = 2*obj.info.FWHM_px*pxSize/1000;
             guess.mu  = planePos(bf);
+            guess.minMaxDomain =[min(domain) max(domain)];
             [Res,fit] = SimpleFitting.gauss1D(data,domain,guess);
 
             z = Res(2);

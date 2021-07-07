@@ -13,6 +13,11 @@ idx1 = strfind(desc,'images=');
 idx2 = strfind(desc,'slices=');
 
 nImages = str2double(desc(idx1+7:idx2-1));
+if isnan(nImages)
+    idx3 = strfind(desc,'frames=');
+    nImages = str2double(desc(idx2+7:idx3-1));
+end
+assert(~isnan(nImages),'Something went wrong when reading the file');
 
 movieInfo.nPlanes = nImages;
 movieInfo.nFrames = 1;
