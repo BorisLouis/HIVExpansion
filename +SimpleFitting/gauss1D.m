@@ -1,4 +1,4 @@
-function [FitPar,Fit]=gauss1D(A,domain,guess)
+function [FitPar,Fit,resNorm]=gauss1D(A,domain,guess)
 
 switch nargin
     case 2 
@@ -23,6 +23,6 @@ lb        = [abs(domain(1)-domain(2))/10     min(minMaxDom)     0        0];
 ub        = [abs(domain(1)-domain(2))*20     max(minMaxDom)     3*val      val];
 initguess = [      sigGuess                  muGuess                          val-min(A) min(A)];
 opts = optimset('Display','off');
-FitPar=lsqcurvefit(@SimpleFitting.gaussian,initguess,domain,A,lb,ub,opts);
+[FitPar,resNorm] = lsqcurvefit(@SimpleFitting.gaussian,initguess,domain,A,lb,ub,opts);
 
 Fit=FitPar(3)*exp(-((domain-FitPar(2))./(sqrt(2).*FitPar(1))).^2)+FitPar(4);

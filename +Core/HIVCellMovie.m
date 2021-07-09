@@ -1,13 +1,12 @@
 classdef HIVCellMovie < Core.HIVLocMovie
     properties (SetAccess = 'protected')
-        Lamina
-        NUP
-        Lipid
-        RedLipid
+        lamina
+        nup
+        lipid
+        
                 
     end
-    
-    
+
     methods
         
         function obj = HIVCellMovie(ext,info,varargin)
@@ -28,22 +27,30 @@ classdef HIVCellMovie < Core.HIVLocMovie
                 S = 2;
                 % size of pixel in z vs x/y
                 zFactor = obj.raw.movInfo(1).zSpacing/obj.info.pxSize;
-                sigma = [S,S,S/zFactor];
-                IMs = imgaussfilt3(data, sigma);
-                disp('DONE with filtering ------------')
+                 if size(data,3)~=1
+                    sigma = [S,S,S/zFactor];
+                    IMs = imgaussfilt3(data, sigma);
+                    neigh = [51 51 3];
+                else
+                    IMs = imgaussfilt(data,S);
+                    neigh = [51 51];
+                end
                 
-                %  gBW = imbinarize(uint16(IMs),'adaptive','Sensitivity',threshold);
-                gBW = imbinarize(uint16(IMs));
+                disp('DONE with filtering ------------')
+                threshold = adaptthresh(uint16(IMs),0.4,'neigh',neigh);
+                gBW = imbinarize(uint16(IMs),threshold);
+             %   gBW = imbinarize(uint16(IMs));
                 gBW = bwareaopen(gBW,10000);
-                se = strel('disk',20);
+                gBW = imclearborder(gBW);
+                se = strel('disk',10);
                 gBW = imclose(gBW,se);
                 
                 %gBW = imfill(gBW,'holes');
                 disp('Extracting Contour')
                 
-                BWdata = regionprops(gBW,{'Area', 'pixelIDXList'});
+                BWdata = regionprops(gBW,{'Area','Perimeter', 'pixelIDXList'});
                 
-                [~,maxArea] = max([BWdata.Area]);
+                [~,maxArea] = max([BWdata.Perimeter]);
                 
                 finalBW = zeros(size(gBW));
                 finalBW(BWdata(maxArea).PixelIdxList) = 1;
@@ -53,8 +60,8 @@ classdef HIVCellMovie < Core.HIVLocMovie
                 %here we obtain the cell contour
                 contour = obj.getContour(finalBW);
                 
-                obj.Lamina.mask = finalBW;
-                obj.Lamina.contour = contour;
+                obj.lamina.mask = finalBW;
+                obj.lamina.contour = contour;
                 %
             end
         end
@@ -62,30 +69,39 @@ classdef HIVCellMovie < Core.HIVLocMovie
         
         function [finalBW] = segmentNUP(obj)
             
-            idx = contains({obj.raw.movInfo.fileName},'NUP','IgnoreCase',true);
+            idx = contains({obj.raw.movInfo.fileName},'nup','IgnoreCase',true);
             if sum(idx)~=1
                 warning('no NUP file was found, operation aborted');
                 
             else
-                data = obj.getFrame(1,'NUP');
+                data = obj.getFrame(1,'nup');
                 % Gaussian filtering
                 S = 5;
                 % size of pixel in z vs x/y
                 zFactor = obj.raw.movInfo(1).zSpacing/obj.info.pxSize;
                 sigma = [S,S,S/zFactor];
-                IMs = imgaussfilt3(data, sigma);
+                if size(data,3)~=1
+                    sigma = [S,S,S/zFactor];
+                    IMs = imgaussfilt3(data, sigma);
+                    neigh = [51 51 3];
+                else
+                    IMs = imgaussfilt(data,S);
+                    neigh = [101 101];
+                end
+                
                 disp('DONE with filtering ------------')
-                
-                gBW = imbinarize(uint16(IMs),'adaptive','Sensitivity',0.2);
+                threshold = adaptthresh(uint16(IMs),0.6,'neigh',neigh);
+                gBW = imbinarize(uint16(IMs),threshold);
+                %gBW = imbinarize(uint16(IMs),'adaptive','Sensitivity',0.4);
                 %  gBW = imbinarize(uint16(IMs));
-                gBW = bwareaopen(gBW,20000);
-                
+                gBW = bwareaopen(gBW,10000);
+                gBW = imclearborder(gBW);
                 se = strel('disk',10);
                 gBW = imclose(gBW,se);
                 
-                BWdata = regionprops(gBW,{'Area', 'pixelIDXList'});
+                BWdata = regionprops(gBW,{'Area','Perimeter','pixelIDXList'});
                 
-                [~,maxArea] = max([BWdata.Area]);
+                [~,maxArea] = max([BWdata.Perimeter]);
                 
                 finalBW = zeros(size(gBW));
                 finalBW(BWdata(maxArea).PixelIdxList) = 1;
@@ -99,8 +115,8 @@ classdef HIVCellMovie < Core.HIVLocMovie
                 %here we obtain the cell contour
                 contour = obj.getContour(finalBW);
                 
-                obj.NUP.mask = finalBW;
-                obj.NUP.contour = contour;
+                obj.nup.mask = finalBW;
+                obj.nup.contour = contour;
             end
         end
         
@@ -190,8 +206,8 @@ classdef HIVCellMovie < Core.HIVLocMovie
                 %here we obtain the cell contour
                 contour = obj.getContour(finalBW);
                 
-                obj.Lipid.mask = finalBW;
-                obj.Lipid.contour = contour;
+                obj.lipid.mask = finalBW;
+                obj.lipid.contour = contour;
             end
             
             
@@ -276,7 +292,6 @@ classdef HIVCellMovie < Core.HIVLocMovie
                     
                     finalBW(:,:,i)  =  biggerMask-finalBW(:,:,i);
                     
-                    
                 end
                 
                 %TODO BW CHECK
@@ -284,18 +299,15 @@ classdef HIVCellMovie < Core.HIVLocMovie
                 %here we obtain the cell contour
                 contour = obj.getContour(finalBW);
                 
-                obj.Lipid.mask = finalBW;
-                obj.Lipid.contour = contour;
-            end
-            
-            
+                obj.lipid.mask = finalBW;
+                obj.lipid.contour = contour;
+            end      
         end
         
         function showMembrane(obj,membrane,idx)
             %get membrane data
             data = obj.getFrame(1,membrane);
             [~,contour,fitMembrane] = getMembrane(obj,membrane);
-            
             
             if nargin<3
                 idx = round(size(data,3)/2);
@@ -320,8 +332,7 @@ classdef HIVCellMovie < Core.HIVLocMovie
                 axis image
                 
             end
-            
-            
+    
         end
         
         function [membrane] = getMembranePos(obj,membrane)
@@ -372,7 +383,8 @@ classdef HIVCellMovie < Core.HIVLocMovie
 
                         pxLine = currData(idx);
                         %get minimum and maximum of the vector
-                        %check that x is 
+                        %check which coordinate has the large differential
+                        %to be used as domain for fitting
                         if abs(mean(diff(xVec)))< abs(mean(diff(yVec)))
                             vec2Use = yVec;
                             minMax  = [y(1) y(2)];
@@ -380,14 +392,15 @@ classdef HIVCellMovie < Core.HIVLocMovie
                             vec2Use = xVec;
                             minMax  = [x(1) x(2)];close all
                         end
-
-                        
+           
                         guess.sig = 10;
                         guess.mu  = vec2Use(round(length(pxLine)/2));
                         guess.minMaxDomain = minMax;
 
                         try
-                        [gPar, Fit] = SimpleFitting.gauss1D(pxLine,vec2Use,guess);
+                            [gPar, Fit,res] = SimpleFitting.gauss1D(pxLine,vec2Use,guess);
+                            mse(1,j) = gPar(2) - median(vec2Use);
+                            mse(2,j) =max(pxLine)/std(pxLine); 
                         catch
                         end
 %                                           figure
@@ -416,21 +429,14 @@ classdef HIVCellMovie < Core.HIVLocMovie
                         end
 
                     end
-                    membranePos{i} = fContour;
+                    membranePos{i} = [smooth(fContour(:,1)) smooth(fContour(:,2))];
                 end
 
             else
                 membranePos = [];
             end
             
-            switch lower(membrane)
-                case 'lamina'
-                    obj.Lamina.membranePos = membranePos;
-                case 'nup'
-                    obj.NUP.membranePos = membranePos;
-                case 'lipid'
-                    obj.Lipid.membranePos = membranePos;
-            end
+            obj.(lower(membrane)).membranePos = membranePos;
             
         end      
         
@@ -444,25 +450,8 @@ classdef HIVCellMovie < Core.HIVLocMovie
                 contour = [];
                 
             else                
-                switch lower(membrane)
-                    case 'lamina'
-                        
-                        var = 'Lamina';
-                    
-                    case 'nup'
-                        
-                        var = 'NUP';
-                    
-                    case 'lipid'
-                        
-                        var = 'Lipid';
-                    
-                    otherwise
-                        
-                        error('Unknown membrane requested')
                 
-                end
-                
+                var = lower(membrane);
                 contour = obj.(var).contour;
                 mask    = obj.(var).mask;
                 if isfield(obj.(var),'membranePos')
@@ -492,20 +481,37 @@ classdef HIVCellMovie < Core.HIVLocMovie
                 
                 %get sign of distance to membrane by looking if particle is
                 %inside or outside of it, inside will be positive, outside
-                %will be negative
+                %will be negative for that, we compare the distances with
+                %the center of mass
                 
-                minXm = min(currMembrane(:,1));
-                maxXm = max(currMembrane(:,1));
-                minYm = min(currMembrane(:,2));
-                maxYm = max(currMembrane(:,2));
+                CM = mean(currMembrane,1);
+                %find the closest point on the membrane to the current
+                %particle
+                [~,idx] = min(sqrt((currPart.col-currMembrane(:,1)).^2 +(currPart.row-currMembrane(:,2)).^2));
                 
-                if and(and(minXm<currPart.col,maxXm>currPart.col),and(minYm<currPart.row,maxYm>currPart.row))
-                    mult = 1;
-                else
-                    mult = -1;
-                end
- 
-                partPos.dist2Mem = mult*min(sqrt((currPart.col-currMembrane(:,1)).^2 +(currPart.row-currMembrane(:,2)).^2));
+                %get the distance between the current point and the CM
+                dist2CM = sqrt((currPart.col-CM(1)).^2 +(currPart.row-CM(2)).^2);
+                %get the distance between the closest point on the membrane
+                %and the CM
+                distMem2CM = sqrt((currMembrane(idx,1)-CM(1)).^2 +(currMembrane(idx,2)-CM(2)).^2);
+                %substract one by the other so if the particle is closer to
+                %the CM than the membrane it gives a positive distance and
+                %a negative otherwise.
+                
+                partPos.dist2Mem(i) = distMem2CM-dist2CM;
+
+%                 minXm = min(currMembrane(:,1));
+%                 maxXm = max(currMembrane(:,1));
+%                 minYm = min(currMembrane(:,2));
+%                 maxYm = max(currMembrane(:,2));
+%                 
+%                 if and(and(minXm<currPart.col,maxXm>currPart.col),and(minYm<currPart.row,maxYm>currPart.row))
+%                     mult = 1;
+%                 else
+%                     mult = -1;
+%                 end
+%  
+%                partPos.dist2Mem(i) = mult*min(sqrt((currPart.col-currMembrane(:,1)).^2 +(currPart.row-currMembrane(:,2)).^2));
 
             end
             
@@ -514,6 +520,55 @@ classdef HIVCellMovie < Core.HIVLocMovie
             
         end
         
+        function [distances] = getMembraneToMembraneDistance(obj,membrane1,membrane2)
+            
+            mem1 = obj.(lower(membrane1)).membranePos;
+            mem2 = obj.(lower(membrane2)).membranePos;
+            distances = cell(size(mem1));
+            pxSize = obj.info.pxSize;
+            for i = 1:length(mem1)
+               %change from pixels to nanometer
+               currMem1 = mem1{i}*pxSize;
+               currMem2 = mem2{i}*pxSize;
+               
+               distances{i} = zeros(length(currMem1),1);
+               
+               for j =1:length(currMem1)
+                   currPoint = currMem1(j,:);
+                  
+                   CM = mean(currMem2,1);
+                   %find the closest point on the membrane to the current
+                   %particle
+                   [~,idx] = min(sqrt((currPoint(:,1)-currMem2(:,1)).^2 +(currPoint(:,2)-currMem2(:,2)).^2));
+
+                   %get the distance between the current point and the CM
+                   distMem12CM = sqrt((currPoint(:,1)-CM(1)).^2 +(currPoint(:,2)-CM(2)).^2);
+                   %get the distance between the closest point on the membrane
+                   %and the CM
+                   distMem22CM = sqrt((currMem2(idx,1)-CM(1)).^2 +(currMem2(idx,2)-CM(2)).^2);
+                   
+%                  minXm = min(currMem2(:,1));
+%                  maxXm = max(currMem2(:,1));
+%                  minYm = min(currMem2(:,2));
+%                  maxYm = max(currMem2(:,2));
+%                 
+%                     if and(and(minXm<currPoint(:,1),maxXm>currPoint(:,1)),and(minYm<currPoint(:,2),maxYm>currPoint(:,2)))
+%                         mult = 1;
+%                     else
+%                         mult = -1;
+%                     end
+                distances{i}(j) = distMem22CM-distMem12CM;
+                
+               end
+                
+            end
+            
+            
+            
+            
+            
+        end
+               
         function plotContour3D(obj,frame)
             
             contourTmp = obj.contour{frame};
@@ -601,167 +656,6 @@ classdef HIVCellMovie < Core.HIVLocMovie
                 title('unicolor');
             end
             
-            
-            
-        end
-        
-        function makeMovie(obj)
-            
-            filename = [obj.raw.movInfo.Path filesep 'VisMov.gif'];
-            frameRate = 5;
-            trailing = 5;
-            sizeParticles = 1000;
-            frames = obj.raw.movInfo.nFrame;
-            file2Test = [obj.raw.movInfo.path2Cell filesep 'mask.mat'];
-            assert(isfile(file2Test),'no mask was found, please run getCellMask first')
-            %load mask data
-            allData = load(file2Test);
-            field = fieldnames(allData);
-            allData = allData.(field{1});
-            
-            %get traces and clean
-            traces = obj.traces3D;
-            allHeight = cellfun(@height,traces);
-            traces(allHeight<10) = [];
-            
-            Fig = figure(1);
-            hold on
-            xLimit =[1 obj.raw.movInfo.Width*obj.raw.movInfo.pxSize];
-            yLimit =[1 obj.raw.movInfo.Length*obj.raw.movInfo.pxSize];
-            zLimit =[0 length(obj.raw.movInfo.planePos)*obj.info.dZ];
-            
-            [x,y,z] = sphere(32);
-            x = x*sizeParticles/2;
-            y = y*sizeParticles/2;
-            z = z*sizeParticles/2;
-            
-            for i = 1:frames
-                data2Render = allData(:,:,:,i);
-                smoothISurface = isosurface(data2Render,1/2);
-                
-                % smoothing using compiled c code
-                % smoothISurface = rendering3D.smoothpatch(iSurface,0,1);
-                %comnvert to px
-                smoothISurface.vertices(:,1) = (smoothISurface.vertices(:,1))*obj.raw.movInfo.pxSize;
-                smoothISurface.vertices(:,2) = (smoothISurface.vertices(:,2))*obj.raw.movInfo.pxSize;
-                smoothISurface.vertices(:,3) = (smoothISurface.vertices(:,3))*obj.info.dZ;
-                
-                p2 = patch(smoothISurface);
-                p2.FaceColor = [0.4 0.4 0.4];
-                p2.EdgeColor = 'none';
-                
-                title(['Frame ' num2str(i)]);
-                axis image
-                xlim(xLimit);
-                ylim(yLimit);
-                zlim(zLimit)
-                xlim manual;
-                ylim manual;
-                zlim manual;
-                
-                
-                for j = 1:length(traces)
-                    currTrace = traces{j};
-                    idx2Frame = currTrace.t==i;
-                    idx = i-trailing:i;
-                    idx = ismember(currTrace.t,idx);
-                    if ~all(idx==0)
-                        
-                        data2Plot = currTrace(idx,:);
-                        hold on
-                        plot3(data2Plot.col,data2Plot.row,data2Plot.z,'color',[0 0 1])
-                        try
-                            X = x+currTrace.col(idx2Frame);
-                            Y = y+currTrace.row(idx2Frame);
-                            Z = z+currTrace.z(idx2Frame);
-                        catch
-                            X = x+data2Plot.col(end,:);
-                            Y = y+data2Plot.row(end,:);
-                            Z = z+data2Plot.z(end,:);
-                        end
-                        
-                        surf(X,Y,Z,'LineStyle','none','Facecolor',[0.78 0.2 0.2])
-                        
-                        
-                    end
-                end
-                camlight
-                view(3)
-                lighting gouraud
-                axis image
-                xlim(xLimit);
-                ylim(yLimit);
-                zlim(zLimit)
-                xlim manual;
-                ylim manual;
-                zlim manual;
-                
-                drawnow;
-                frame = getframe(Fig);
-                im = frame2im(frame);
-                [imind,cm] = rgb2ind(im,256);
-                
-                if i == 1
-                    
-                    imwrite(imind,cm,filename,'gif','DelayTime',1/frameRate, 'loopcount',inf);
-                    
-                else
-                    
-                    imwrite(imind,cm,filename,'gif','DelayTime',1/frameRate, 'writemode','append');
-                    
-                end
-                clf;
-            end
-            
-            
-            
-            
-        end
-        
-        function plotTraces(obj)
-            frames = obj.raw.movInfo.nFrame;
-            
-            file2Test = [obj.raw.movInfo.path2Cell filesep 'mask.mat'];
-            assert(isfile(file2Test),'no mask was found, please run getCellMask first')
-            %load mask data
-            allData = load(file2Test);
-            field = fieldnames(allData);
-            allData = allData.(field{1});
-            
-            
-            %average the mask over time
-            maskData = squeeze(mean(allData,4));
-            %get traces  and clean up
-            traces = obj.traces3D;
-            allHeight = cellfun(@height,traces);
-            traces(allHeight<10) = [];
-            
-            Fig = figure;
-            hold on
-            data2Render = maskData;
-            smoothISurface = isosurface(data2Render,1/2);
-            
-            % smoothing using compiled c code
-            % smoothISurface = rendering3D.smoothpatch(iSurface,0,1);
-            %convert to px
-            smoothISurface.vertices(:,1) = (smoothISurface.vertices(:,1))*obj.raw.movInfo.pxSize;
-            smoothISurface.vertices(:,2) = (smoothISurface.vertices(:,2))*obj.raw.movInfo.pxSize;
-            smoothISurface.vertices(:,3) = (smoothISurface.vertices(:,3))*obj.info.dZ;
-            
-            p2 = patch(smoothISurface);
-            p2.FaceColor = [0.4 0.4 0.4];
-            p2.EdgeColor = 'none';
-            
-            title(['Tracked traces']);
-            axis image
-            box on
-            
-            for j = 1:length(traces)
-                currTrace = traces{j};
-                plot3(currTrace.col,currTrace.row,currTrace.z)
-                
-            end
-            view(2)
             
             
         end

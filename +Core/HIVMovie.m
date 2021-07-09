@@ -90,9 +90,18 @@ classdef HIVMovie < handle
                     end
                 end
             end
-            % here we check that there is only one file per datatype
+            %Clean up the files if they do not correspond with the data
+            %files
             dataT = {obj.raw.movInfo.datatype};
+            idx2Delete = cellfun(@isempty,dataT);
+            obj.raw.movInfo(idx2Delete) = [];
+            movInfo(idx2Delete) = [];
+            dataT(idx2Delete) = [];
+            warning(['One of the file in the directory did not match any of the type expected:'...
+                ' NUP,Lamina,Lipid,HIV.',' The analysis will pursue but please check that this is not due to a typo',...
+                'you might need to rerun the analysis once the filenames are fixed']);
             
+            % here we check that there is only one file per datatype
             assert(isequal(sort(dataT), unique(dataT)),['Found more than one '...
                 'file per datatype, please check directory and filenames, '...
                 'Expect only one or zero of each of these files: NUP,Lamina,HIV,Lipid'])

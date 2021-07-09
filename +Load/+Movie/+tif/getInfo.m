@@ -17,7 +17,10 @@ if isnan(nImages)
     idx3 = strfind(desc,'frames=');
     nImages = str2double(desc(idx2+7:idx3-1));
 end
-assert(~isnan(nImages),'Something went wrong when reading the file');
+if isnan(nImages)
+    nImages =1;
+    warning('Could not determine the number of image in file, assuming 1');
+%assert(~isnan(nImages),'Something went wrong when reading the file');
 
 movieInfo.nPlanes = nImages;
 movieInfo.nFrames = 1;
