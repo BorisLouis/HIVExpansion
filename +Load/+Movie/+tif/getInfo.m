@@ -21,6 +21,7 @@ if isnan(nImages)
     nImages =1;
     warning('Could not determine the number of image in file, assuming 1');
 %assert(~isnan(nImages),'Something went wrong when reading the file');
+end
 
 movieInfo.nPlanes = nImages;
 movieInfo.nFrames = 1;

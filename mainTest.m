@@ -9,7 +9,7 @@ close all
 clc
 
 %% User Input
-path = 'D:\Documents\Unif\PhD\2021-Data\07 - Jul\Aline HIV\DATA Boris\Seperate channels NUP Lamin HIV\Cell1'; %give empty brackets [], to open file selection
+path = 'D:\Documents\Unif\PhD\2021-Data\08 - August\Aline HIV\Cell'; %give empty brackets [], to open file selection
 ext = '.tif'; %expected extension of the movie(s);
 info.runMethod = 'load'; %'load'or 'run', if load is chosen it will try to load previously calculated data(e.g localized particles)
 info.fitMethod = 'phasor'; %'Gauss' or 'phasor'
@@ -44,29 +44,43 @@ HIVData.superResolve();
 
 %% Segmentation of Lamina
 membrane = 'lamina';
-HIVData.segmentLamina();
+sensitivity = 0.4;
+HIVData.segmentLamina(sensitivity,true);
 HIVData.showMembrane(membrane);
 %% Segmentation of NUP
-HIVData.segmentNUP();
+sensitivity = 0.4;%put higher when signal is worst (e.g. expansion images)
+HIVData.segmentNUP(sensitivity,true);
 membrane = 'NUP';
 HIVData.showMembrane(membrane);
 %% Segmentation of Lipid
 membrane = 'lipid';
-HIVData.segmentLipid();
-HIVData.showMembrane(membrane);
+%HIVData.segmentLipid();
+%HIVData.showMembrane(membrane);
 %% Segmentation of red lipid
 HIVData.segmentRedLipid();
+HIVData.showMembrane('lipid',1);
 
-
+%% fit lipid
+HIVData.getMembranePos('lipid');
+HIVData.showMembrane('lipid');
 %% get membrane position 
-membrane = 'lipid';
+membrane = 'lamina';
 HIVData.getMembranePos(membrane);
-%%
 HIVData.showMembrane(membrane,1);
+% get second membrane position
+membrane = 'NUP';
+HIVData.getMembranePos(membrane);
+HIVData.showMembrane(membrane,2);
+
+%%
+HIVData.showAllMembranes;
+
+%% Get Distance between membranes
+distance = HIVData.getMembraneToMembraneDistance('lamina','NUP');
 
 %% Get distance between particles and membrane
-membrane = 'lipid';
-HIVData.getHIVToMembraneDistance(membrane);
+
+a = HIVData.getHIVToMembraneDistance('NUP');
 
 
 

@@ -15,7 +15,7 @@ classdef HIVCellMovie < Core.HIVLocMovie
             
         end
         
-        function [finalBW] = segmentLamina(obj,sensitivity,clearBorder)
+        function [finalBW] = segmentLamina(obj,sensitivity)
             
             idx = contains({obj.raw.movInfo.fileName},'lamina','IgnoreCase',true);
             if sum(idx)~=1
@@ -41,11 +41,9 @@ classdef HIVCellMovie < Core.HIVLocMovie
                 gBW = imbinarize(uint16(IMs),threshold);
              %   gBW = imbinarize(uint16(IMs));
                 gBW = bwareaopen(gBW,round(0.03*numel(gBW(:,:,1))));
-                if clearBorder
-                    for i = 1:size(gBW,3)
-                        gBW(:,:,i) = imclearborder(gBW(:,:,i));
-                    end
-                end    
+                for i = 1:size(gBW,3)
+                    gBW(:,:,i) = imclearborder(gBW(:,:,i));
+                end
                 se = strel('disk',10);
                 gBW = imclose(gBW,se);
                 
@@ -77,7 +75,7 @@ classdef HIVCellMovie < Core.HIVLocMovie
             end
         end
             
-        function [finalBW] = segmentNUP(obj,sensitivity,clearBorder)
+        function [finalBW] = segmentNUP(obj,sensitivity)
             
             idx = contains({obj.raw.movInfo.fileName},'nup','IgnoreCase',true);
             if sum(idx)~=1
@@ -105,11 +103,10 @@ classdef HIVCellMovie < Core.HIVLocMovie
                 %gBW = imbinarize(uint16(IMs),'adaptive','Sensitivity',0.4);
                 %  gBW = imbinarize(uint16(IMs));
                 gBW = bwareaopen(gBW,round(0.03*numel(gBW(:,:,1))));
-                if clearBorder
-                    for i = 1:size(gBW,3)
-                        gBW(:,:,i) = imclearborder(gBW(:,:,i));
-                    end
-                end    
+                
+                for i = 1:size(gBW,3)
+                    gBW(:,:,i) = imclearborder(gBW(:,:,i),18);
+                end
                 se = strel('disk',10);
                 gBW = imclose(gBW,se);
                 

@@ -9,7 +9,7 @@ close all
 clc
 
 %% User Input
-path = 'D:\Documents\Unif\PhD\2021-Data\07 - Jul\Aline HIV\DATA Boris\Seperate channels post ExM NUP Lamin\Cell4'; %give empty brackets [], to open file selection
+path = 'D:\Documents\Unif\PhD\2021-Data\07 - Jul\Aline HIV\DATA Boris\Seperate channels post ExM NUP Lamin\Cell1'; %give empty brackets [], to open file selection
 ext = '.tif'; %expected extension of the movie(s);
 info.runMethod = 'load'; %'load'or 'run', if load is chosen it will try to load previously calculated data(e.g localized particles)
 info.fitMethod = 'phasor'; %'Gauss' or 'phasor'
@@ -44,7 +44,7 @@ HIVData.superResolve();
 
 %% Segmentation of Lamina
 HIVData.segmentLamina();
-HIVData.showMembrane(membranes{1});
+HIVData.showMembrane('lamina');
 %% Segmentation of NUP
 HIVData.segmentNUP();
 HIVData.showMembrane(membranes{2});
@@ -56,6 +56,10 @@ HIVData.getMembranePos(membranes{2});
 %% Show membrane and fit
 HIVData.showMembrane(membranes{1},1);
 HIVData.showMembrane(membranes{2},1);
+
+%% Plot membrane on top of each other
+HIVData.showAllMembranes;
+
 %% Get distance between particles and Lamina
 %HIVData.getHIVToMembraneDistance(membranes{1});
 
